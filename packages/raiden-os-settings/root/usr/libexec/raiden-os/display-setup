@@ -1,0 +1,377 @@
+#!/usr/bin/python3
+"""Run every monitor at its highest refresh rate, and fit @DISTRO_NAME@
+wallpapers to ultrawide screens.
+
+Most monitors name a 60 Hz mode as "preferred" in their EDID even when they
+can do 120, 144 or 240 Hz, and GNOME starts with the preferred mode. When a
+set of monitors has no saved configuration yet, this switches each one to the
+fastest refresh rate at its current resolution and saves that configuration in
+monitors.xml, where GNOME picks it up at every later login. A set that already
+has a saved configuration is left alone, so whatever the user picks in
+Settings -> Displays is kept.
+
+Wallpapers in /usr/share/backgrounds/raiden-os that have an
+"<name>-ultrawide.<ext>" sibling get that version while the main monitor is
+ultrawide (21:9 or wider), and the normal one otherwise.
+
+The login screen (GDM) runs as its own temporary user and starts no helpers,
+so the session hands it its display configuration (same layout and refresh
+rates) and the fitting version of the login picture, through
+login-screen-sync.
+
+    display-setup            run in the session, follow changes
+    display-setup --once     apply once and exit
+"""
+import hashlib
+import os
+import re
+import subprocess
+import sys
+import xml.etree.ElementTree as ET
+
+from gi.repository import Gio, GLib
+
+DISPLAY_CONFIG = ("org.gnome.Mutter.DisplayConfig", "/org/gnome/Mutter/DisplayConfig",
+                  "org.gnome.Mutter.DisplayConfig")
+# "Persistent" changes bring up "Keep these display settings?" and are undone
+# after 20 s unless someone confirms, so apply temporarily and save ourselves.
+METHOD_TEMPORARY = 1
+LAYOUT_PHYSICAL = 2
+WALLPAPER_DIR = "/usr/share/backgrounds/raiden-os/"
+ULTRAWIDE_ASPECT = 2.1      # 21:9 is 2.33-2.39, 32:9 is 3.56; 16:9 is 1.78
+WALLPAPER_KEYS = [("org.gnome.desktop.background", "picture-uri"),
+                  ("org.gnome.desktop.background", "picture-uri-dark"),
+                  ("org.gnome.desktop.screensaver", "picture-uri")]
+LOGIN_HELPER = "/usr/libexec/raiden-os/login-screen-sync"
+LOGIN_CONF = "/etc/gdm3/raiden-login-background"
+
+
+def log(msg):
+    print(f"display-setup: {msg}", file=sys.stderr, flush=True)
+
+
+# ------------------------------------------------------------ mutter state
+class Monitor:
+    def __init__(self, spec, modes, props):
+        self.spec = tuple(spec)                      # connector, vendor, product, serial
+        self.connector = spec[0]
+        self.modes = modes                           # (id, w, h, hz, pref scale, scales, props)
+        self.props = props
+        self.current = next((m for m in modes if m[6].get("is-current")), None)
+
+
+def get_state(bus):
+    reply = bus.call_sync(*DISPLAY_CONFIG, "GetCurrentState", None, None,
+                          Gio.DBusCallFlags.NONE, -1, None)
+    serial, monitors, logical, props = reply.unpack()
+    return serial, [Monitor(*m) for m in monitors], logical, props
+
+
+def set_key(monitors):
+    """Identifies a set of connected monitors (like monitors.xml does)."""
+    return "\n".join(sorted("|".join(m.spec) for m in monitors))
+
+
+def monitors_xml():
+    return os.path.join(GLib.get_user_config_dir(), "monitors.xml")
+
+
+def configured_sets():
+    """Monitor sets that already have a configuration in monitors.xml."""
+    sets = set()
+    try:
+        root = ET.parse(monitors_xml()).getroot()
+    except (OSError, ET.ParseError):
+        return sets
+    for conf in root.iter("configuration"):
+        specs = []
+        for spec in conf.iter("monitorspec"):
+            specs.append("|".join((spec.findtext("connector", ""), spec.findtext("vendor", ""),
+                                   spec.findtext("product", ""), spec.findtext("serial", ""))))
+        if specs:
+            sets.add("\n".join(sorted(specs)))
+    return sets
+
+
+def _monitorspec(parent, spec):
+    el = ET.SubElement(parent, "monitorspec")
+    for tag, value in zip(("connector", "vendor", "product", "serial"), spec):
+        ET.SubElement(el, tag).text = value
+
+
+def save_configuration(monitors, config, layout_mode):
+    """Add CONFIG to monitors.xml in mutter's format, keeping the others."""
+    if any(lm[3] for lm in config):
+        log("rotated monitor; not saving, the change lasts for this session")
+        return
+    path = monitors_xml()
+    try:
+        tree = ET.parse(path)
+        root = tree.getroot()
+    except (OSError, ET.ParseError):
+        root = ET.Element("monitors", version="2")
+        tree = ET.ElementTree(root)
+    by_connector = {m.connector: m for m in monitors}
+    conf = ET.SubElement(root, "configuration")
+    ET.SubElement(conf, "layoutmode").text = (
+        "physical" if layout_mode == LAYOUT_PHYSICAL else "logical")
+    used = set()
+    for x, y, scale, _transform, primary, entries in config:
+        lm = ET.SubElement(conf, "logicalmonitor")
+        ET.SubElement(lm, "x").text = str(x)
+        ET.SubElement(lm, "y").text = str(y)
+        ET.SubElement(lm, "scale").text = repr(float(scale))
+        if primary:
+            ET.SubElement(lm, "primary").text = "yes"
+        for connector, mode_id, _props in entries:
+            mon = by_connector[connector]
+            mode = next(m for m in mon.modes if m[0] == mode_id)
+            used.add(connector)
+            el = ET.SubElement(lm, "monitor")
+            _monitorspec(el, mon.spec)
+            m = ET.SubElement(el, "mode")
+            ET.SubElement(m, "width").text = str(mode[1])
+            ET.SubElement(m, "height").text = str(mode[2])
+            ET.SubElement(m, "rate").text = f"{mode[3]:.3f}"
+    disabled = [m for m in monitors if m.connector not in used]
+    if disabled:
+        el = ET.SubElement(conf, "disabled")
+        for mon in disabled:
+            _monitorspec(el, mon.spec)
+    ET.indent(tree, space="  ")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".raiden-tmp"
+    tree.write(tmp, encoding="unicode")
+    os.replace(tmp, path)
+
+
+# ------------------------------------------------------------ refresh rate
+def fastest_mode(monitor):
+    """The fastest mode at the monitor's current resolution (and VRR setting)."""
+    cur = monitor.current
+    vrr = cur[6].get("refresh-rate-mode", "fixed")
+    same = [m for m in monitor.modes
+            if m[1] == cur[1] and m[2] == cur[2] and not m[6].get("is-interlaced", False)
+            and m[6].get("refresh-rate-mode", "fixed") == vrr]
+    return max(same, key=lambda m: m[3])
+
+
+def plan_max_refresh(monitors, logical):
+    """Logical monitor config for ApplyMonitorsConfig, or None if nothing gains."""
+    by_connector = {m.connector: m for m in monitors}
+    config, changes = [], []
+    for x, y, scale, transform, primary, specs, _props in logical:
+        entries = []
+        for spec in specs:
+            mon = by_connector.get(spec[0])
+            if mon is None or mon.current is None:
+                return None              # the state changed under us; try again later
+            target = mon.current
+            if not mon.props.get("is-for-lease", False):
+                best = fastest_mode(mon)
+                # keep the scale; a mode that does not support it is not worth it
+                if (best[3] > mon.current[3] + 0.5
+                        and any(abs(s - scale) < 0.01 for s in best[5])):
+                    target = best
+                    changes.append(f"{mon.connector} {mon.current[3]:.0f} -> {best[3]:.0f} Hz")
+            entries.append((mon.connector, target[0], {}))
+        config.append((x, y, scale, transform, primary, entries))
+    return (config, changes) if changes else None
+
+
+def apply_max_refresh(bus):
+    serial, monitors, logical, props = get_state(bus)
+    if not monitors or set_key(monitors) in configured_sets():
+        return                     # GNOME uses the saved configuration
+    plan = plan_max_refresh(monitors, logical)
+    if plan is None:
+        return
+    config, changes = plan
+    layout_mode = props.get("layout-mode", 1)
+    options = {}
+    if props.get("supports-changing-layout-mode"):
+        options["layout-mode"] = GLib.Variant("u", layout_mode)
+    bus.call_sync(*DISPLAY_CONFIG, "ApplyMonitorsConfig",
+                  GLib.Variant("(uua(iiduba(ssa{sv}))a{sv})",
+                               (serial, METHOD_TEMPORARY, config, options)),
+                  None, Gio.DBusCallFlags.NONE, -1, None)
+    log("set " + ", ".join(changes))
+    try:
+        save_configuration(monitors, config, layout_mode)
+    except OSError as exc:
+        log(f"could not save monitors.xml: {exc}")
+
+
+# --------------------------------------------------------------- wallpaper
+def primary_is_ultrawide(monitors, logical):
+    by_connector = {m.connector: m for m in monitors}
+    for _x, _y, _scale, transform, primary, specs, _props in logical:
+        if primary and specs:
+            mon = by_connector.get(specs[0][0])
+            if mon is None or mon.current is None:
+                return None
+            w, h = mon.current[1], mon.current[2]
+            if transform % 2:            # rotated by 90 or 270 degrees
+                w, h = h, w
+            return w / h >= ULTRAWIDE_ASPECT
+    return None
+
+
+def wallpaper_variant(uri, ultrawide):
+    if not uri.startswith("file://" + WALLPAPER_DIR):
+        return uri
+    root, ext = os.path.splitext(uri[len("file://"):])
+    if root.endswith("-ultrawide"):
+        root = root[:-len("-ultrawide")]
+    wide = f"{root}-ultrawide{ext}"
+    return "file://" + (wide if ultrawide and os.path.isfile(wide) else root + ext)
+
+
+def fit_wallpapers(bus):
+    """Ultrawide or normal versions of our wallpapers; returns the decision."""
+    _serial, monitors, logical, _props = get_state(bus)
+    ultrawide = primary_is_ultrawide(monitors, logical)
+    if ultrawide is None:
+        return None
+    source = Gio.SettingsSchemaSource.get_default()
+    for schema, key in WALLPAPER_KEYS:
+        if source is None or source.lookup(schema, True) is None:
+            continue
+        settings = Gio.Settings.new(schema)
+        uri = settings.get_string(key)
+        target = wallpaper_variant(uri, ultrawide)
+        if target != uri:
+            settings.set_string(key, target)
+    Gio.Settings.sync()
+    return ultrawide
+
+
+# ------------------------------------------------------------- login screen
+def live_session():
+    try:
+        with open("/proc/cmdline", encoding="utf-8") as f:
+            return "boot=casper" in f.read()
+    except OSError:
+        return False
+
+
+def login_helper(*args, data=None):
+    try:
+        proc = subprocess.run(["pkexec", LOGIN_HELPER, *args], input=data,
+                              capture_output=True, timeout=60)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        log(f"login screen: {exc}")
+        return False
+    if proc.returncode != 0:
+        log(f"login screen: {proc.stderr.decode(errors='replace').strip()}")
+    return proc.returncode == 0
+
+
+def sync_login_monitors():
+    """Hand the display configuration to the login screen when it changed."""
+    try:
+        with open(monitors_xml(), "rb") as f:
+            data = f.read()
+    except OSError:
+        return
+    digest = hashlib.sha256(data).hexdigest()
+    state = os.path.join(GLib.get_user_state_dir(), "raiden-os", "login-monitors.sha256")
+    try:
+        with open(state, encoding="utf-8") as f:
+            if f.read().strip() == digest:
+                return
+    except OSError:
+        pass
+    if login_helper("monitors", data=data):
+        os.makedirs(os.path.dirname(state), exist_ok=True)
+        with open(state, "w", encoding="utf-8") as f:
+            f.write(digest + "\n")
+        log("the login screen now uses these display settings")
+
+
+def sync_login_wallpaper(ultrawide):
+    """Ultrawide or normal version of the login picture, like the desktop."""
+    try:
+        with open(LOGIN_CONF, encoding="utf-8") as f:
+            m = re.search(r"^background-picture-uri='file://([^']+)'$", f.read(), re.M)
+    except OSError:
+        return
+    if not m:
+        return
+    root, ext = os.path.splitext(m.group(1))
+    is_wide = root.endswith("-ultrawide")
+    base = root[:-len("-ultrawide")] if is_wide else root
+    if ultrawide and not is_wide and os.path.isfile(f"{base}-ultrawide{ext}"):
+        login_helper("wallpaper", "ultrawide")
+    elif not ultrawide and is_wide:
+        login_helper("wallpaper", "normal")
+
+
+# --------------------------------------------------------------------- main
+class DisplaySetup:
+    def __init__(self):
+        self.bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+        self.login_screen = not live_session()
+        self.pending = 0
+        self.watched = []
+
+    def run_once(self):
+        try:
+            apply_max_refresh(self.bus)
+        except GLib.Error as exc:
+            log(f"refresh rate: {exc.message}")
+            return False
+        try:
+            ultrawide = fit_wallpapers(self.bus)
+        except GLib.Error as exc:
+            log(f"wallpaper: {exc.message}")
+            ultrawide = None
+        if self.login_screen:
+            sync_login_monitors()
+            if ultrawide is not None:
+                sync_login_wallpaper(ultrawide)
+        return True
+
+    def schedule(self, *_args):
+        # monitor changes come in bursts (and our own change causes one)
+        if self.pending:
+            GLib.source_remove(self.pending)
+        self.pending = GLib.timeout_add(1500, self._run_pending)
+
+    def _run_pending(self):
+        self.pending = 0
+        self.run_once()
+        return GLib.SOURCE_REMOVE
+
+    def watch(self):
+        self.bus.signal_subscribe(DISPLAY_CONFIG[0], DISPLAY_CONFIG[2], "MonitorsChanged",
+                                  DISPLAY_CONFIG[1], None, Gio.DBusSignalFlags.NONE,
+                                  self.schedule)
+        for schema, key in WALLPAPER_KEYS:
+            settings = Gio.Settings.new(schema)
+            settings.connect(f"changed::{key}", self.schedule)
+            self.watched.append(settings)
+        # Settings -> Displays saves monitors.xml when a change is kept
+        monitor = Gio.File.new_for_path(monitors_xml()).monitor_file(Gio.FileMonitorFlags.NONE, None)
+        monitor.connect("changed", lambda _m, _f, _o, event: event in (
+            Gio.FileMonitorEvent.CHANGES_DONE_HINT, Gio.FileMonitorEvent.CREATED,
+            Gio.FileMonitorEvent.RENAMED, Gio.FileMonitorEvent.MOVED_IN) and self.schedule())
+        self.watched.append(monitor)
+
+
+def main():
+    setup = DisplaySetup()
+    # the compositor may still be starting; give it a few tries
+    for _ in range(10):
+        if setup.run_once():
+            break
+        GLib.usleep(2_000_000)
+    if "--once" in sys.argv:
+        return 0
+    setup.watch()
+    GLib.MainLoop().run()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

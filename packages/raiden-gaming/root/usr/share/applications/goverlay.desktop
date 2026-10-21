@@ -1,0 +1,11 @@
+[Desktop Entry]
+# GOverlay's window calls itself "goverlay" while its launcher is named
+# io.github.benjamimgois.goverlay; this hidden entry lets the taskbar show
+# the open window with GOverlay's name and icon.
+Type=Application
+Name=GOverlay
+Comment=Set up the MangoHud overlay for games
+Exec=goverlay
+TryExec=goverlay
+Icon=goverlay
+NoDisplay=true

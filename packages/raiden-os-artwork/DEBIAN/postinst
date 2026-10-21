@@ -1,0 +1,14 @@
+#!/bin/sh
+set -e
+THEME=/usr/share/plymouth/themes/raiden-os/raiden-os.plymouth
+if [ "$1" = configure ]; then
+    update-alternatives --install /usr/share/plymouth/themes/default.plymouth \
+        default.plymouth "$THEME" 200
+    # Rebuild the initramfs once at the end of this dpkg run so the splash is used
+    dpkg-trigger --no-await update-initramfs 2>/dev/null || true
+    # The login screen reads its background from /usr/share/gdm/dconf
+    if [ -x /usr/share/gdm/generate-config ] && getent passwd gdm >/dev/null; then
+        /usr/share/gdm/generate-config >/dev/null 2>&1 || true
+    fi
+fi
+exit 0

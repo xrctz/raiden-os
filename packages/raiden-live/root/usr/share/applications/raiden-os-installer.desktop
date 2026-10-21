@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Install @DISTRO_NAME@
+GenericName=Install @DISTRO_NAME@
+Comment=Install @DISTRO_NAME@ on this computer
+Exec=raiden-install
+Icon=raiden-os-installer
+Terminal=false
+StartupNotify=true
+Categories=System;
+Keywords=installer;install;calamares;setup;

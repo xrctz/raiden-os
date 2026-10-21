@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Restart into Windows
+Comment=Restart the computer and start Windows this one time
+Exec=/usr/libexec/raiden-os/restart-into-windows
+Icon=system-reboot
+Categories=System;
+Keywords=windows;reboot;restart;dual boot;
+StartupNotify=false

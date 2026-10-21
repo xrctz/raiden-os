@@ -1,0 +1,339 @@
+#!/usr/bin/python3
+"""Install and update the apps that are not plain Ubuntu packages:
+
+  google-chrome    Google Chrome                      (Google's apt repository)
+  claude           Claude                             (Anthropic's apt repository)
+  antigravity      Google Antigravity, the agent app  (antigravity.google, tarball, /opt)
+  antigravity-ide  Google Antigravity IDE             (antigravity.google, tarball, /opt)
+  protonplus       ProtonPlus, Proton/Wine manager    (GitHub releases, AppImage, /opt)
+  heroic           Heroic Games Launcher              (GitHub releases, .deb; updated
+                                                       only while it is installed)
+
+    apps-update install FILE...   install these downloads (image build)
+    apps-update check             install missing apps and newer releases (timer)
+    apps-update status            show the installed releases
+
+"check" installs each app once if it is missing: the public edition of the
+ISO leaves out Chrome, Claude and Antigravity, whose licences do not allow
+passing them on, so they arrive with the first check that has internet. An
+app removed after that stays removed. Chrome and Claude then update through
+apt like any package; for the others "check" looks up the newest release and
+installs it, but only while that app is closed: a running app breaks when its
+files change under it, so a busy app is updated on a later run instead.
+Files given to "install" carry app and release in their names, like the
+download links: antigravity-2.24.0-5780333019398144-linux-x64.tar.gz,
+protonplus-0.6.8-x86_64.AppImage.
+"""
+import gzip
+import hashlib
+import json
+import os
+import platform
+import pwd
+import re
+import shutil
+import subprocess
+import sys
+import tarfile
+import tempfile
+import urllib.request
+
+ARM = platform.machine() in ("aarch64", "arm64")
+AG_ARCH = "linux-arm" if ARM else "linux-x64"
+CACHE = "/var/cache/raiden-apps"
+STATE = "/var/lib/raiden-apps"     # one file per app that has been installed once
+RELEASE_FILE = ".raiden-release"
+AGENT = {"User-Agent": "raiden-os-apps-update"}
+AG_PAGE = "https://antigravity.google/download?os=linux"
+APT_ENV = dict(os.environ, DEBIAN_FRONTEND="noninteractive")
+APT_OPTS = ["-y", "-q", "-o", "DPkg::Lock::Timeout=900",
+            "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold"]
+
+APPS = {
+    "google-chrome": dict(
+        name="Google Chrome", dest="/opt/google/chrome", package="google-chrome-stable", kind="apt"),
+    "claude": dict(
+        name="Claude", dest="/usr/lib/claude-desktop", package="claude-desktop", kind="apt"),
+    "antigravity": dict(
+        name="Antigravity", dest="/opt/antigravity", binary="antigravity", kind="tar",
+        electron=True, page=AG_PAGE,
+        url=r"https://storage\.googleapis\.com/antigravity-public/antigravity-hub/"
+            r"(?P<release>[0-9][^/\"']*)/" + AG_ARCH + r"/Antigravity\.tar\.gz"),
+    "antigravity-ide": dict(
+        name="Antigravity IDE", dest="/opt/antigravity-ide", binary="antigravity-ide", kind="tar",
+        electron=True, page=AG_PAGE,
+        url=r"https://edgedl\.me\.gvt1\.com/edgedl/release2/j0qc3/antigravity/stable/"
+            r"(?P<release>[0-9][^/\"']*)/" + AG_ARCH + r"/Antigravity%20IDE\.tar\.gz"),
+    "protonplus": dict(
+        name="ProtonPlus", dest="/opt/protonplus", binary="AppRun", kind="appimage",
+        github="Vysp3r/ProtonPlus",
+        asset=r"ProtonPlus-.*-anylinux-" + ("aarch64" if ARM else "x86_64") + r"\.AppImage"),
+    "heroic": dict(
+        name="Heroic Games Launcher", dest="/opt/Heroic", package="heroic", kind="deb",
+        github="Heroic-Games-Launcher/HeroicGamesLauncher",
+        asset=r"Heroic-.*-linux-" + ("arm64" if ARM else "amd64") + r"\.deb"),
+}
+
+
+def log(msg):
+    print(f"apps-update: {msg}", flush=True)
+
+
+def release_key(release):
+    """2.24.0-5780333019398144 -> (2, 24, 0, 5780333019398144)"""
+    return tuple(int(n) for n in re.findall(r"\d+", release))
+
+
+def installed_release(app):
+    a = APPS[app]
+    if a["kind"] in ("deb", "apt"):
+        r = subprocess.run(["dpkg-query", "-W", "-f=${db:Status-Status} ${Version}", a["package"]],
+                           capture_output=True, text=True)
+        status, _, version = r.stdout.partition(" ")
+        return version.strip() if status == "installed" else None
+    try:
+        with open(os.path.join(a["dest"], RELEASE_FILE), encoding="utf-8") as f:
+            return f.read().strip()
+    except OSError:
+        return None
+
+
+def is_running(dest):
+    """True if any process runs a program from DEST."""
+    prefix = os.path.realpath(dest) + os.sep
+    for pid in filter(str.isdigit, os.listdir("/proc")):
+        try:
+            if os.readlink(f"/proc/{pid}/exe").startswith(prefix):
+                return True
+        except OSError:
+            continue
+    return False
+
+
+# ------------------------------------------------------------- unpacking
+def unpack_tar(path, into):
+    with tarfile.open(path) as tar:
+        tops = {m.name.split("/", 1)[0] for m in tar.getmembers()}
+        if len(tops) != 1:
+            raise RuntimeError(f"unexpected tarball layout: {sorted(tops)[:5]}")
+        tar.extractall(into, filter="tar")
+    return os.path.join(into, tops.pop())
+
+
+def unpack_appimage(path, into):
+    """AppImages unpack themselves ("--appimage-extract"). That runs as an
+    unprivileged user, so nothing downloaded runs as root, and in a PID
+    namespace of its own, so nothing it starts outlives it."""
+    nobody = pwd.getpwnam("nobody")
+    os.chmod(into, 0o711)
+    work = tempfile.mkdtemp(prefix="appimage-", dir=into)
+    image = os.path.join(work, "app.AppImage")
+    shutil.copyfile(path, image)
+    os.chmod(image, 0o755)
+    for p in (work, image):
+        os.chown(p, nobody.pw_uid, nobody.pw_gid)
+    subprocess.run(["unshare", "--pid", "--fork",
+                    "setpriv", f"--reuid={nobody.pw_uid}", f"--regid={nobody.pw_gid}",
+                    "--clear-groups", "--no-new-privs", image, "--appimage-extract"],
+                   cwd=work, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                   env={"PATH": "/usr/bin:/bin", "HOME": work})
+    # the folder is "AppDir" or "squashfs-root", depending on the AppImage
+    # runtime (which may also link one name to the other)
+    dirs = [e.path for e in os.scandir(work) if e.is_dir(follow_symlinks=False)]
+    if len(dirs) != 1:
+        raise RuntimeError(f"unexpected AppImage layout in {path}")
+    return dirs[0]
+
+
+def install_deb(app, path, release):
+    """Update a .deb app through apt, which also brings in new dependencies
+    (and never removes packages for it)."""
+    subprocess.run(["apt-get", "install", *APT_OPTS, "--no-remove", path],
+                   check=True, env=APT_ENV, stdout=subprocess.DEVNULL)
+    log(f"installed {APPS[app]['name']} {release}")
+
+
+def install_apt(app):
+    """Install an app from its maker's apt repository (set up by the image)."""
+    subprocess.run(["apt-get", "install", *APT_OPTS, "--no-remove", APPS[app]["package"]],
+                   check=True, env=APT_ENV, stdout=subprocess.DEVNULL)
+    log(f"installed {APPS[app]['name']} {installed_release(app)}")
+
+
+# An app is installed once, the first time it is missing; a file per app in
+# STATE remembers that, so an app the user removes later stays removed.
+def remember(app):
+    os.makedirs(STATE, exist_ok=True)
+    open(os.path.join(STATE, app), "w").close()
+
+
+def remembered(app):
+    return os.path.exists(os.path.join(STATE, app))
+
+
+def refresh_launchers():
+    """The /opt apps' launchers come with the image, and GNOME hides each one
+    while its program is missing. Rebuilding the launcher cache, as apt does
+    after installing a package, makes GNOME look again: a new app shows up in
+    the taskbar and start menu right away instead of after the next login."""
+    subprocess.run(["update-desktop-database", "-q", "/usr/share/applications"], check=False)
+
+
+def install(app, path, release):
+    """Unpack PATH next to the destination, then swap it in."""
+    a = APPS[app]
+    if a["kind"] == "deb":
+        return install_deb(app, path, release)
+    dest = a["dest"]
+    parent = os.path.dirname(dest)
+    os.makedirs(parent, exist_ok=True)
+    new = tempfile.mkdtemp(prefix=f".{os.path.basename(dest)}.new-", dir=parent)
+    try:
+        top = unpack_tar(path, new) if a["kind"] == "tar" else unpack_appimage(path, new)
+        if not os.access(os.path.join(top, a["binary"]), os.X_OK):
+            raise RuntimeError(f"{a['binary']} missing in {path}")
+        # system files belong to root, whatever owners the download names
+        for root, dirs, files in os.walk(top):
+            for name in dirs + files:
+                os.lchown(os.path.join(root, name), 0, 0)
+        os.lchown(top, 0, 0)
+        os.chmod(top, 0o755)
+        # Electron's sandbox helper must be setuid root (Ubuntu restricts the
+        # unprivileged user namespaces it would use otherwise)
+        if a.get("electron"):
+            os.chmod(os.path.join(top, "chrome-sandbox"), 0o4755)
+        with open(os.path.join(top, RELEASE_FILE), "w", encoding="utf-8") as f:
+            f.write(release + "\n")
+        old = None
+        if os.path.exists(dest):
+            old = tempfile.mkdtemp(prefix=f".{os.path.basename(dest)}.old-", dir=parent)
+            os.rename(dest, os.path.join(old, "x"))
+        os.rename(top, dest)
+        if old:
+            shutil.rmtree(old, ignore_errors=True)
+        refresh_launchers()
+        log(f"installed {a['name']} {release}")
+    finally:
+        shutil.rmtree(new, ignore_errors=True)
+
+
+# --------------------------------------------------------------- lookups
+def fetch(url):
+    req = urllib.request.Request(url, headers=dict(AGENT, **{"Accept-Encoding": "gzip"}))
+    with urllib.request.urlopen(req, timeout=60) as r:
+        body = r.read()
+    # some of Google's servers send the download page gzipped even when that
+    # was not asked for, so look at the data rather than the headers
+    if body[:2] == b"\x1f\x8b":
+        body = gzip.decompress(body)
+    return body.decode("utf-8", errors="replace")
+
+
+def latest(app, pages):
+    """(release, download URL, SHA-256 or None) of the newest release, or None."""
+    a = APPS[app]
+    if "page" in a:
+        if a["page"] not in pages:
+            pages[a["page"]] = fetch(a["page"])
+        m = re.search(a["url"], pages[a["page"]])
+        return (m.group("release"), m.group(0), None) if m else None
+    rel = json.loads(fetch(f"https://api.github.com/repos/{a['github']}/releases/latest"))
+    for asset in rel.get("assets", []):
+        if re.fullmatch(a["asset"], asset["name"]):
+            digest = asset.get("digest") or ""
+            sha256 = digest[7:] if digest.startswith("sha256:") else None
+            return rel["tag_name"].lstrip("v"), asset["browser_download_url"], sha256
+    return None
+
+
+def download(url, app, release, sha256):
+    os.makedirs(CACHE, mode=0o700, exist_ok=True)
+    ext = ".deb" if APPS[app]["kind"] == "deb" else ".download"
+    path = os.path.join(CACHE, f"{app}-{release}{ext}")
+    h = hashlib.sha256()
+    with urllib.request.urlopen(urllib.request.Request(url, headers=AGENT), timeout=120) as r, \
+            open(path + ".part", "wb") as f:
+        while chunk := r.read(1 << 20):
+            h.update(chunk)
+            f.write(chunk)
+    if sha256 and h.hexdigest() != sha256.lower():
+        raise RuntimeError(f"download of {url} is damaged (checksum mismatch)")
+    os.replace(path + ".part", path)
+    return path
+
+
+def check():
+    pages = {}
+    apt_lists = False
+    for app, a in APPS.items():
+        have = installed_release(app)
+        if have:
+            remember(app)
+        elif remembered(app) or a["kind"] == "deb":
+            continue                      # removed by the user: leave it removed
+        if a["kind"] == "apt":
+            if have:
+                continue                  # apt and its updates take care of it
+            try:
+                if not apt_lists:
+                    subprocess.run(["apt-get", "update", "-q", "-o", "DPkg::Lock::Timeout=900"],
+                                   check=True, env=APT_ENV, stdout=subprocess.DEVNULL)
+                    apt_lists = True
+                install_apt(app)
+                remember(app)
+            except (OSError, subprocess.CalledProcessError) as exc:
+                log(f"could not install {a['name']}, trying again next time: {exc}")
+            continue
+        try:
+            found = latest(app, pages)
+        except (OSError, ValueError) as exc:
+            log(f"cannot look up {a['name']}: {exc}")
+            continue
+        if not found:
+            log(f"no download found for {a['name']} (did the download page change?)")
+            continue
+        release, url, sha256 = found
+        if have and release_key(release) <= release_key(have):
+            continue
+        if is_running(a["dest"]):
+            log(f"{a['name']} {release} is available; it is open, so it is updated next time")
+            continue
+        log(f"downloading {a['name']} {release}")
+        try:
+            install(app, download(url, app, release, sha256), release)
+            remember(app)
+        except (OSError, RuntimeError, tarfile.TarError, subprocess.CalledProcessError) as exc:
+            log(f"could not update {a['name']}: {exc}")
+        finally:
+            shutil.rmtree(CACHE, ignore_errors=True)
+    return 0
+
+
+def app_and_release(path):
+    name = os.path.basename(path)
+    for app in sorted(APPS, key=len, reverse=True):          # antigravity-ide first
+        m = re.match(re.escape(app) + r"[-_](\d+(?:\.\d+)+(?:-\d+)?)[-_.]", name)
+        if m:
+            return app, m.group(1)
+    raise SystemExit(f"cannot tell app and release from {name}")
+
+
+def main(argv):
+    if os.geteuid() != 0:
+        raise SystemExit("apps-update must run as root")
+    if len(argv) >= 3 and argv[1] == "install":
+        for path in argv[2:]:
+            app, release = app_and_release(path)
+            install(app, os.path.abspath(path), release)
+        return 0
+    if len(argv) == 2 and argv[1] == "check":
+        return check()
+    if len(argv) == 2 and argv[1] == "status":
+        for app, a in APPS.items():
+            print(f"{a['name']}: {installed_release(app) or 'not installed'}")
+        return 0
+    raise SystemExit(__doc__)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+if [ "$1" = remove ] || [ "$1" = purge ]; then
+    update-alternatives --remove default.plymouth \
+        /usr/share/plymouth/themes/raiden-os/raiden-os.plymouth 2>/dev/null || true
+    if [ -x /usr/share/gdm/generate-config ] && getent passwd gdm >/dev/null; then
+        /usr/share/gdm/generate-config >/dev/null 2>&1 || true
+    fi
+fi
+exit 0

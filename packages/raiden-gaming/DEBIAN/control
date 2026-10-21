@@ -1,0 +1,19 @@
+Package: raiden-gaming
+Version: @VERSION@
+Architecture: all
+Maintainer: @DISTRO_NAME@ <noreply@example.invalid>
+Section: games
+Priority: optional
+Depends: gamemode, procps, kmod, adduser
+Recommends: mangohud, gamescope, goverlay
+Description: Game tuning for @DISTRO_NAME@
+ System settings that make Windows games under Proton and native games run
+ faster and smoother, in the spirit of SteamOS and Bazzite:
+  - Wine/Proton NT synchronisation in the kernel (ntsync)
+  - no split-lock slowdowns on Intel CPUs
+  - the memory-map limit SteamOS uses (some games crash with less)
+  - larger shader caches for NVIDIA and Mesa (fewer stutters)
+  - GameMode set up so it can actually raise CPU speed and game priority
+    (Ubuntu leaves out the "gamemode" group its permissions need)
+  - Steam listed as "Steam" from the start, on the fast GPU of laptops with
+    two graphics chips

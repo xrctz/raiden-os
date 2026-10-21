@@ -1,0 +1,20 @@
+#!/bin/sh
+set -e
+if [ "$1" = configure ]; then
+    # GameMode only changes CPU speed and game priority for members of the
+    # "gamemode" group (its polkit rule and limits.d file), which Ubuntu does
+    # not create. Create it; the installer adds new users to it, and the
+    # administrators of an existing system join it here once.
+    if ! getent group gamemode >/dev/null; then
+        addgroup --system --quiet gamemode
+        for u in $(getent group sudo | cut -d: -f4 | tr ',' ' '); do
+            adduser --quiet "$u" gamemode || true
+        done
+    fi
+    if [ -d /run/systemd/system ]; then
+        # apply right away on a running system (new installs get it at boot)
+        sysctl -q --load=/usr/lib/sysctl.d/90-raiden-gaming.conf >/dev/null 2>&1 || true
+        modprobe ntsync >/dev/null 2>&1 || true
+    fi
+fi
+exit 0

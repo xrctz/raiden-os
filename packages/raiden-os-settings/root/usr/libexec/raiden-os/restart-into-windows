@@ -1,0 +1,54 @@
+#!/usr/bin/python3
+"""Restart into Windows: asks first, then makes the next boot start Windows
+from the boot menu (once) and restarts.
+
+The boot entry is set by set-next-boot-windows through pkexec, which polkit
+allows without a password for the person at the computer, like restarting.
+The installer adds this app only where it finds Windows.
+"""
+import sys
+
+import gi
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+from gi.repository import Adw, Gio, GLib  # noqa: E402
+
+HELPER = "/usr/libexec/raiden-os/set-next-boot-windows"
+
+
+class RestartApp(Adw.Application):
+    def __init__(self):
+        super().__init__(application_id="org.raidenos.RestartWindows",
+                         flags=Gio.ApplicationFlags.DEFAULT_FLAGS)
+
+    def do_activate(self):
+        self.hold()
+        dialog = Adw.AlertDialog(
+            heading="Restart into Windows?",
+            body="Save your work first. The computer restarts and starts Windows "
+                 "this one time; after that it starts as usual again.")
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("restart", "Restart")
+        dialog.set_response_appearance("restart", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("restart")
+        dialog.set_close_response("cancel")
+        dialog.choose(None, None, self._chosen)
+
+    def _chosen(self, dialog, result):
+        if dialog.choose_finish(result) == "restart":
+            try:
+                Gio.Subprocess.new(["pkexec", HELPER], Gio.SubprocessFlags.NONE).wait_check(None)
+                Gio.Subprocess.new(["gnome-session-quit", "--reboot", "--no-prompt"],
+                                   Gio.SubprocessFlags.NONE)
+            except GLib.Error as exc:
+                error = Adw.AlertDialog(heading="Could not restart into Windows",
+                                        body=exc.message)
+                error.add_response("close", "Close")
+                error.choose(None, None, lambda d, r: (d.choose_finish(r), self.release()))
+                return
+        self.release()
+
+
+if __name__ == "__main__":
+    sys.exit(RestartApp().run(sys.argv))

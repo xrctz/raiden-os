@@ -1,0 +1,24 @@
+# Build output. The ISO (over 4 GB) is too big for git; rebuild it with
+# .\build.ps1 (the build's work files live inside the WSL distro anyway).
+/out/
+/iso/
+
+# Editor and OS clutter
+__pycache__/
+*.pyc
+*.blend1
+*.swp
+*~
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Your personal edition: own settings and character themes, kept on this PC
+# only. The build uses them when present; see "Your own personal edition" in
+# the README.
+/personal/
+
+# Large third-party apps (some over GitHub's 100 MB file limit).
+# scripts/fetch-vendor.sh downloads them and checks them against
+# vendor/SHA256SUMS, which is tracked.
+/vendor/apps/

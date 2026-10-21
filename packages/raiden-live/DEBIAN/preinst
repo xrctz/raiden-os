@@ -1,0 +1,22 @@
+#!/bin/sh
+set -e
+# 1. casper hides the NVIDIA udev rule in live sessions (Ubuntu never ships the
+#    NVIDIA driver on its live ISO). @DISTRO_NAME@ does, so the rule must work
+#    there: replace that casper script with a no-op.
+# 2. casper switches on swap partitions found on disks, which makes those
+#    disks "in use" for the installer: replace that script with a no-op too.
+# 3. Hide Calamares' generic launcher; we provide "Install @DISTRO_NAME@".
+# Diverted originals are moved out of their directories so nothing picks them up.
+if [ "$1" = install ] || [ "$1" = upgrade ]; then
+    mkdir -p /usr/share/raiden-live/diverted
+    dpkg-divert --package raiden-live --add --rename \
+        --divert /usr/share/raiden-live/diverted/56override_nvidia_udev_rule \
+        /usr/share/initramfs-tools/scripts/casper-bottom/56override_nvidia_udev_rule
+    dpkg-divert --package raiden-live --add --rename \
+        --divert /usr/share/raiden-live/diverted/13swap \
+        /usr/share/initramfs-tools/scripts/casper-bottom/13swap
+    dpkg-divert --package raiden-live --add --rename \
+        --divert /usr/share/raiden-live/diverted/calamares.desktop \
+        /usr/share/applications/calamares.desktop
+fi
+exit 0

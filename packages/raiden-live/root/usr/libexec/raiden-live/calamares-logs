@@ -1,0 +1,14 @@
+#!/bin/bash
+# Keep the installer logs in the installed system (/var/log/installer).
+ROOT="${1:?usage: calamares-logs TARGET_ROOT}"
+D="$ROOT/var/log/installer"
+mkdir -p "$D"
+for f in /root/.cache/calamares/session.log /home/*/.cache/calamares/session.log; do
+    [ -f "$f" ] && cp "$f" "$D/calamares-session.log"
+done
+[ -f /var/log/raiden-postinstall.log ] && cp /var/log/raiden-postinstall.log "$D/"
+[ -f /cdrom/.disk/info ] && cp /cdrom/.disk/info "$D/media-info"
+[ -f /var/log/casper.log ] && cp /var/log/casper.log "$D/"
+chmod 600 "$D"/* 2>/dev/null
+[ -f "$D/media-info" ] && chmod 644 "$D/media-info"
+exit 0

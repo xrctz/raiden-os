@@ -1,0 +1,8 @@
+// @DISTRO_NAME@: Google Chrome updates install automatically in the
+// background, like Ubuntu's security updates, so the browser never waits
+// for a click to get its security fixes. (Claude's package adds the same
+// kind of entry for itself.) Remove this line to update Chrome by hand in
+// Software Updater instead.
+Unattended-Upgrade::Origins-Pattern {
+	"origin=Google LLC,archive=stable,site=dl.google.com";
+};

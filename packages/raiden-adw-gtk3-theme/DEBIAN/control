@@ -1,0 +1,9 @@
+Package: raiden-adw-gtk3-theme
+Version: @VERSION@
+Architecture: all
+Maintainer: @DISTRO_NAME@ <noreply@example.invalid>
+Section: gnome
+Priority: optional
+Description: adw-gtk3 theme (libadwaita look for GTK3 apps)
+ The unofficial GTK3 port of libadwaita (adw-gtk3 v6.5, LGPL-2.1+), so older
+ GTK3 applications match modern GNOME apps in light and dark mode.

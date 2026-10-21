@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>Install Raiden OS</title>
+  <defs>
+    <linearGradient id="in-fill" x1="0.1" y1="0.05" x2="0.92" y2="0.97">
+      <stop offset="0" stop-color="#2BD9F0"/>
+      <stop offset="0.45" stop-color="#3D6BF7"/>
+      <stop offset="1" stop-color="#7B3AED"/>
+    </linearGradient>
+    <linearGradient id="in-shine" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.30"/>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="in-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="5" stdDeviation="6" flood-color="#1B1650" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="64" fill="url(#in-fill)"/>
+  <rect x="8" y="8" width="240" height="240" rx="64" fill="url(#in-shine)"/>
+  <g filter="url(#in-shadow)">
+    <g fill="none" stroke="#FFFFFF" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M128 50 V140"/>
+      <path d="M88 104 L128 144 L168 104"/>
+    </g>
+    <rect x="58" y="164" width="140" height="40" rx="14" fill="#FFFFFF"/>
+    <circle cx="176" cy="184" r="7" fill="#3D6BF7"/>
+  </g>
+</svg>

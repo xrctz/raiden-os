@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=Antigravity
+GenericName=AI Agent Workspace
+Comment=Google's agent-first app for building with Gemini
+Exec=/opt/antigravity/antigravity %U
+TryExec=/opt/antigravity/antigravity
+Icon=antigravity
+Terminal=false
+Categories=Development;
+Keywords=google;gemini;agent;ai;coding;
+MimeType=x-scheme-handler/antigravity;
+StartupWMClass=Antigravity
+StartupNotify=true

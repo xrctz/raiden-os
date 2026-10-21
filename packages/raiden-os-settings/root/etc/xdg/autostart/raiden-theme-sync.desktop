@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=@DISTRO_NAME@ Theme Sync
+Comment=Keeps older apps and icons in step with the light/dark style
+Exec=/usr/libexec/raiden-os/theme-sync
+OnlyShowIn=GNOME;
+NoDisplay=true

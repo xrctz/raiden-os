@@ -1,0 +1,170 @@
+#!/usr/bin/python3
+"""Keep the rest of the desktop in step with the light/dark switch and the
+character theme.
+
+GNOME's "Dark Style" toggle only changes org.gnome.desktop.interface
+color-scheme, which libadwaita (GTK4) apps follow automatically. Older GTK3
+apps need the matching adw-gtk3 / adw-gtk3-dark theme, and the Papirus icons
+have light and dark variants. This small helper runs in the user session and
+switches both, but only while they are set to themes it manages, so custom
+user choices are never overridden.
+
+It also follows the wallpaper: a character theme's picture decides the desktop
+icon label colour and the window open/close effects (Burn My Windows
+profiles), and any other wallpaper gets the default @DISTRO_NAME@ effects.
+"""
+import glob
+import json
+import os
+import sys
+
+from gi.repository import Gio, GLib
+
+IFACE = "org.gnome.desktop.interface"
+BACKGROUND = "org.gnome.desktop.background"
+DING = "org.gnome.shell.extensions.ding"
+BMW = "org.gnome.shell.extensions.burn-my-windows"
+BMW_PROFILE = "org.gnome.shell.extensions.burn-my-windows-profile"
+CHARACTERS = "/usr/share/raiden-os/characters"
+GTK_THEMES = {"light": "adw-gtk3", "dark": "adw-gtk3-dark"}
+ICON_THEMES = {"light": "Papirus", "dark": "Papirus-Dark"}
+MANAGED_GTK = set(GTK_THEMES.values())
+MANAGED_ICONS = set(ICON_THEMES.values()) | {"Papirus-Light"}
+
+# Window effects when the wallpaper is not a character theme: windows appear
+# with a glow that runs through the colours like the Aurora wallpaper.
+DEFAULT_EFFECTS = {
+    "open": {"effect": "aura-glow", "animation-time": 650, "speed": 2.0, "saturation": 0.7},
+    "close": {"effect": "apparition", "animation-time": 450},
+}
+# Burn My Windows picks the most specific profile, and between equally
+# specific ones the first by file name; these sort before its own
+# (timestamp-named) profiles.
+PROFILE_FILES = {"open": "0000-raiden-os-open.conf", "close": "0001-raiden-os-close.conf"}
+ANIMATION_TYPE = {"open": 1, "close": 2}
+
+
+def schema_exists(schema_id):
+    source = Gio.SettingsSchemaSource.get_default()
+    return source is not None and source.lookup(schema_id, True) is not None
+
+
+def base_wallpaper(uri):
+    """The wallpaper URI without the "-ultrawide" variant suffix."""
+    root, ext = os.path.splitext(uri)
+    return (root[:-len("-ultrawide")] if root.endswith("-ultrawide") else root) + ext
+
+
+def current_theme(mode):
+    """The character theme whose wallpaper is set, or None."""
+    if not schema_exists(BACKGROUND):
+        return None
+    bg = Gio.Settings.new(BACKGROUND)
+    uri = base_wallpaper(bg.get_string("picture-uri-dark" if mode == "dark" else "picture-uri"))
+    for path in glob.glob(CHARACTERS + "/*.json"):
+        try:
+            with open(path, encoding="utf-8") as f:
+                theme = json.load(f)
+        except (OSError, ValueError):
+            continue
+        if isinstance(theme, dict) and uri == "file://" + str(theme.get("wallpaper", "")):
+            return theme
+    return None
+
+
+# ------------------------------------------------------------ window effects
+def profile_text(kind, spec):
+    """A Burn My Windows profile (key file) that plays one effect."""
+    source = Gio.SettingsSchemaSource.get_default()
+    schema = source.lookup(BMW_PROFILE, True)
+    values = {"profile-animation-type": ANIMATION_TYPE[kind]}
+    # every effect off except ours (Fire is on by default)
+    for key in schema.list_keys():
+        if key.endswith("-enable-effect"):
+            values[key] = False
+    effect = spec["effect"]
+    values[f"{effect}-enable-effect"] = True
+    for name, value in spec.items():
+        if name != "effect":
+            values[f"{effect}-{name}"] = value
+    lines = ["[burn-my-windows-profile]"]
+    for key in sorted(values):
+        if not schema.has_key(key):
+            continue
+        vtype = schema.get_key(key).get_value_type().dup_string()
+        lines.append(f"{key}={GLib.Variant(vtype, values[key]).print_(False)}")
+    return "\n".join(lines) + "\n"
+
+
+def sync_effects(theme):
+    if not schema_exists(BMW) or not schema_exists(BMW_PROFILE):
+        return
+    effects = (theme or {}).get("effects") or DEFAULT_EFFECTS
+    folder = os.path.join(GLib.get_user_config_dir(), "burn-my-windows", "profiles")
+    changed = False
+    for kind, name in PROFILE_FILES.items():
+        path = os.path.join(folder, name)
+        text = profile_text(kind, effects.get(kind, DEFAULT_EFFECTS[kind]))
+        try:
+            with open(path, encoding="utf-8") as f:
+                if f.read() == text:
+                    continue
+        except OSError:
+            pass
+        os.makedirs(folder, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(text)
+        changed = True
+    if changed:
+        # Burn My Windows reloads its profiles when this key changes
+        bmw = Gio.Settings.new(BMW)
+        bmw.set_string("active-profile", "")
+        bmw.set_string("active-profile", os.path.join(folder, PROFILE_FILES["open"]))
+
+
+# --------------------------------------------------------------------- sync
+def sync(settings, *_args):
+    mode = "dark" if settings.get_string("color-scheme") == "prefer-dark" else "light"
+    gtk = settings.get_string("gtk-theme")
+    if gtk in MANAGED_GTK and gtk != GTK_THEMES[mode]:
+        settings.set_string("gtk-theme", GTK_THEMES[mode])
+    icons = settings.get_string("icon-theme")
+    if icons in MANAGED_ICONS and icons != ICON_THEMES[mode]:
+        settings.set_string("icon-theme", ICON_THEMES[mode])
+    theme = current_theme(mode)
+    # Desktop icon labels: dark text reads better on the light wallpaper, or
+    # whatever the current character theme's picture asks for
+    source = Gio.SettingsSchemaSource.get_default()
+    schema = source.lookup(DING, True) if source else None
+    if schema is not None and schema.has_key("dark-text-in-labels"):
+        ding = Gio.Settings.new(DING)
+        text = (theme or {}).get("desktop_text")
+        want = (text == "dark") if text in ("dark", "light") else mode == "light"
+        if ding.get_boolean("dark-text-in-labels") != want:
+            ding.set_boolean("dark-text-in-labels", want)
+    try:
+        sync_effects(theme)
+    except (OSError, GLib.Error, KeyError, TypeError) as exc:
+        print(f"theme-sync: window effects: {exc}", file=sys.stderr)
+
+
+def main():
+    source = Gio.SettingsSchemaSource.get_default()
+    if source is None or source.lookup(IFACE, True) is None:
+        return 0
+    settings = Gio.Settings.new(IFACE)
+    settings.connect("changed::color-scheme", sync)
+    if source.lookup(BACKGROUND, True) is not None:
+        background = Gio.Settings.new(BACKGROUND)
+        background.connect("changed::picture-uri", lambda *_: sync(settings))
+        background.connect("changed::picture-uri-dark", lambda *_: sync(settings))
+    sync(settings)
+    if "--once" in sys.argv:
+        Gio.Settings.sync()
+        return 0
+    GLib.MainLoop().run()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

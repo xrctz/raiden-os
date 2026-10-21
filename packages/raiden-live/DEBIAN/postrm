@@ -1,0 +1,18 @@
+#!/bin/sh
+set -e
+if [ "$1" = remove ] || [ "$1" = abort-install ] || [ "$1" = disappear ]; then
+    dpkg-divert --package raiden-live --remove --rename \
+        --divert /usr/share/raiden-live/diverted/56override_nvidia_udev_rule \
+        /usr/share/initramfs-tools/scripts/casper-bottom/56override_nvidia_udev_rule
+    dpkg-divert --package raiden-live --remove --rename \
+        --divert /usr/share/raiden-live/diverted/13swap \
+        /usr/share/initramfs-tools/scripts/casper-bottom/13swap
+    dpkg-divert --package raiden-live --remove --rename \
+        --divert /usr/share/raiden-live/diverted/calamares.desktop \
+        /usr/share/applications/calamares.desktop
+    rmdir /usr/share/raiden-live/diverted /usr/share/raiden-live 2>/dev/null || true
+fi
+if [ "$1" = purge ]; then
+    deb-systemd-helper purge raiden-live-setup.service >/dev/null 2>&1 || true
+fi
+exit 0

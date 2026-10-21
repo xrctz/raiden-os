@@ -1,0 +1,2 @@
+// @DISTRO_NAME@: refresh the firmware fallback boot loader after package changes
+DPkg::Post-Invoke { "if [ -x /usr/libexec/raiden-os/efi-fallback-sync ]; then /usr/libexec/raiden-os/efi-fallback-sync || true; fi"; };

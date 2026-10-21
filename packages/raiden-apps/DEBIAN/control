@@ -1,0 +1,22 @@
+Package: raiden-apps
+Version: @VERSION@
+Architecture: all
+Maintainer: @DISTRO_NAME@ <noreply@example.invalid>
+Section: misc
+Priority: optional
+Depends: python3, ca-certificates, util-linux, adduser, desktop-file-utils
+Recommends: google-chrome-stable, papirus-icon-theme
+Description: Third-party apps for @DISTRO_NAME@
+ Installs the apps whose makers publish Linux versions only as downloads,
+ with launchers, and keeps them current: a timer installs new releases
+ while the apps are closed.
+  - Google Antigravity, the agent app, and the Antigravity IDE
+  - ProtonPlus, which installs Proton-GE and other compatibility tools for
+    Steam, Lutris and Heroic
+  - Heroic Games Launcher (the image ships its .deb; updates come from here)
+ Apps the ISO leaves out (the public edition has no Google Chrome, Claude or
+ Antigravity, whose licences do not allow passing them on) are installed
+ from their makers the first time the computer is online.
+ Also adds Outlook and Microsoft 365 as web apps in their own windows, and
+ lets administrators run virtual machines (kvm group), which Claude's
+ Cowork tasks use.

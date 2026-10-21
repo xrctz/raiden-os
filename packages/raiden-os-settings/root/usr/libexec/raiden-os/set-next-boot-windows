@@ -1,0 +1,13 @@
+#!/bin/sh
+# Make the next boot start Windows, this one time (run through pkexec by
+# restart-into-windows). It only ever picks the Windows entry that os-prober
+# put in the boot menu.
+set -eu
+CFG=/boot/grub/grub.cfg
+
+# menuentry 'Windows Boot Manager (on /dev/sda1)' ... $menuentry_id_option 'osprober-efi-XXXX' {
+id=$(awk -F"'" '/^menuentry .Windows/ {
+        for (i = 1; i < NF; i++) if ($i ~ /\$menuentry_id_option *$/) { print $(i + 1); exit }
+     }' "$CFG")
+[ -n "$id" ] || { echo "the boot menu has no Windows entry" >&2; exit 1; }
+exec grub-reboot "$id"

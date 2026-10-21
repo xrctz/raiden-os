@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Try or Install @DISTRO_NAME@
+Exec=/usr/libexec/raiden-live/live-prompt
+Icon=raiden-os-installer
+OnlyShowIn=GNOME;
+NoDisplay=true

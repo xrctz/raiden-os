@@ -1,0 +1,38 @@
+#!/bin/bash
+# Start the @DISTRO_NAME@ installer (Calamares) from the live session.
+# Calamares needs root; it is run through sudo (passwordless in the live
+# session) while keeping access to the user's Wayland/X11 display.
+if [ "$(id -u)" -ne 0 ]; then
+    if pgrep -x calamares >/dev/null; then
+        exit 0                       # already running
+    fi
+    # The installer only offers automatic partitioning ("Erase disk") for
+    # disks with nothing mounted or unlocked: release drives opened in Files.
+    findmnt -rn -o SOURCE,TARGET | while read -r src target; do
+        case "$target" in
+            /media/*|/run/media/*)
+                udisksctl unmount --no-user-interaction -b "$src" >/dev/null 2>&1 ||
+                    logger -t raiden-install "could not unmount $src from $target"
+                ;;
+        esac
+    done
+    lsblk -rnpo NAME,TYPE,PKNAME | while read -r name type parent; do
+        if [ "$type" = crypt ] && [ -n "$parent" ]; then
+            udisksctl lock --no-user-interaction -b "$parent" >/dev/null 2>&1 ||
+                logger -t raiden-install "could not lock $parent ($name)"
+        fi
+    done
+    xhost +si:localuser:root >/dev/null 2>&1 || true
+    exec sudo --preserve-env=WAYLAND_DISPLAY,XDG_RUNTIME_DIR,DISPLAY,XAUTHORITY,XDG_CURRENT_DESKTOP,XDG_SESSION_TYPE,LANG,LANGUAGE,LC_ALL,HOME \
+        "$0" "$@"
+fi
+
+# --- running as root from here on
+if [ -n "${WAYLAND_DISPLAY:-}" ] && [ -n "${XDG_RUNTIME_DIR:-}" ] && [ "${WAYLAND_DISPLAY#/}" = "$WAYLAND_DISPLAY" ]; then
+    # absolute socket path: works even though root does not own the runtime dir
+    export WAYLAND_DISPLAY="$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY"
+fi
+export QT_QPA_PLATFORM="wayland;xcb"
+export QT_WAYLAND_DECORATION=adwaita
+export QT_QUICK_CONTROLS_STYLE=Fusion
+exec calamares -D6 "$@"

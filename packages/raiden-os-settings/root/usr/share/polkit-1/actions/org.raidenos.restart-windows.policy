@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <vendor>@DISTRO_NAME@</vendor>
+  <action id="org.raidenos.set-next-boot-windows">
+    <description>Start Windows at the next boot</description>
+    <message>Authentication is required to start Windows at the next boot</message>
+    <icon_name>system-reboot</icon_name>
+    <defaults>
+      <!-- like restarting the computer: free for the person at it -->
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>yes</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/raiden-os/set-next-boot-windows</annotate>
+  </action>
+</policyconfig>

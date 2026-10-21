@@ -1,0 +1,12 @@
+Package: raiden-gnome-extensions
+Version: @VERSION@
+Architecture: all
+Maintainer: @DISTRO_NAME@ <noreply@example.invalid>
+Section: gnome
+Priority: optional
+Depends: gnome-shell (>= 50~), gnome-shell (<< 52~), gir1.2-gmenu-3.0
+Description: GNOME Shell extensions used by @DISTRO_NAME@ layouts
+ System-wide copies of Dash to Panel (taskbar), ArcMenu (start menu),
+ Blur my Shell (glass effects), Caffeine, Desktop Cube and the Magic Lamp
+ minimize effect, pinned to versions that support GNOME 50. Their settings
+ schemas are installed globally so @DISTRO_NAME@ can provide defaults.

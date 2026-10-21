@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Appearance
+GenericName=Desktop Layout and Style
+Comment=Choose your desktop layout, light or dark style, wallpaper and effects
+Exec=raiden-appearance
+Icon=raiden-appearance
+Terminal=false
+Categories=GNOME;GTK;Settings;DesktopSettings;
+Keywords=layout;taskbar;dock;theme;dark;light;accent;wallpaper;windows;macos;effects;blur;
+StartupNotify=true
+X-GNOME-UsesNotifications=false

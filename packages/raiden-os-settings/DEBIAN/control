@@ -1,0 +1,15 @@
+Package: raiden-os-settings
+Version: @VERSION@
+Architecture: all
+Maintainer: @DISTRO_NAME@ <noreply@example.invalid>
+Section: misc
+Priority: optional
+Depends: python3, python3-gi, gir1.2-glib-2.0, gir1.2-gtk-4.0, gir1.2-adw-1, pkexec, grub-common, ca-certificates
+Description: @DISTRO_NAME@ system identity and default settings
+ Operating system identity (os-release), desktop defaults (theme, layout,
+ fonts, power and privacy settings), boot menu theme selection, compressed
+ RAM swap (zram), NetworkManager setup and the APT policy that keeps Snap
+ out (Firefox, if installed, comes from Mozilla's own repository). Session
+ helpers run monitors at their highest refresh rate, keep the theme and
+ window effects in step with the wallpaper, and restart into Windows on
+ dual-boot machines.

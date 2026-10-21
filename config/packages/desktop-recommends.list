@@ -1,0 +1,159 @@
+# Recommends of the raiden-desktop metapackage: apps and extras.
+# Installed by default, but users may remove any of them without losing the
+# metapackage (which is what keeps future updates complete).
+
+# Apps
+# Google Chrome (Google's own repository; replaces Firefox, see README)
+google-chrome-stable
+ptyxis
+gnome-text-editor
+loupe
+papers
+showtime
+rhythmbox
+gnome-calculator
+gnome-calendar
+gnome-weather
+gnome-clocks
+gnome-characters
+gnome-font-viewer
+gnome-snapshot
+simple-scan
+baobab
+gnome-disk-utility
+gnome-logs
+resources
+seahorse
+file-roller
+deja-dup
+timeshift
+gnome-tweaks
+gnome-shell-extension-manager
+gnome-shell-extension-prefs
+gnome-shell-extension-gsconnect
+libreoffice-writer
+libreoffice-calc
+libreoffice-impress
+libreoffice-gnome
+libreoffice-style-colibre
+libreoffice-draw
+
+# School and work: PDF notes and handwriting, e-books; Office-compatible fonts
+# (Carlito and Caladea have Calibri's and Cambria's metrics, so documents
+# from Microsoft Word keep their layout). Outlook and Microsoft 365 are web
+# apps from raiden-apps.
+xournalpp
+foliate
+fonts-crosextra-carlito
+fonts-crosextra-caladea
+
+# AI: Claude (Anthropic's repository). Antigravity and Antigravity IDE come
+# with raiden-apps.
+claude-desktop
+
+# Games: Steam, Heroic (Epic, GOG, Amazon; the image build adds its .deb),
+# Lutris, ProtonPlus (raiden-apps); FPS overlay, upscaling and system tuning
+steam-installer
+steam-devices
+heroic
+lutris
+mangohud
+goverlay
+gamescope
+raiden-gaming
+raiden-apps
+vulkan-tools
+mesa-utils
+gufw
+fastfetch
+inxi
+htop
+git
+curl
+wget
+nano
+gnome-remote-desktop
+
+# Hardware support
+thermald
+fprintd
+libpam-fprintd
+fwupd
+fwupd-signed
+bluez
+bluez-cups
+libspa-0.2-bluetooth
+modemmanager
+usb-modeswitch
+mesa-vulkan-drivers
+va-driver-all
+intel-media-va-driver-non-free
+gamemode
+spice-vdagent
+
+# Printing and scanning
+cups
+cups-bsd
+cups-client
+cups-filters
+cups-pk-helper
+ghostscript
+hplip
+openprinting-ppds
+foomatic-db-compressed-ppds
+printer-driver-brlaser
+printer-driver-c2esp
+printer-driver-foo2zjs
+printer-driver-m2300w
+printer-driver-min12xxw
+printer-driver-pnm2ppa
+printer-driver-ptouch
+printer-driver-pxljr
+printer-driver-sag-gdi
+printer-driver-splix
+ipp-usb
+sane-airscan
+
+# Network extras
+avahi-daemon
+libnss-mdns
+wsdd
+gvfs-backends
+gvfs-fuse
+network-manager-openvpn-gnome
+network-manager-pptp-gnome
+network-manager-config-connectivity-ubuntu
+
+# Multimedia codecs
+gstreamer1.0-plugins-good
+gstreamer1.0-plugins-bad
+gstreamer1.0-plugins-ugly
+gstreamer1.0-libav
+libavcodec-extra
+ffmpeg
+gst-audio-thumbnailer
+gst-video-thumbnailer
+
+# Fonts
+fonts-noto-core
+fonts-noto-cjk
+fonts-noto-color-emoji
+fonts-liberation
+fonts-jetbrains-mono
+fonts-ubuntu
+
+# Input methods and accessibility
+ibus
+ibus-gtk
+ibus-gtk3
+ibus-gtk4
+ibus-table
+im-config
+orca
+speech-dispatcher
+
+# Misc
+apt-config-icons-hidpi
+memtest86+
+language-pack-en
+language-pack-gnome-en

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Welcome
+GenericName=Getting Started
+Comment=First steps with @DISTRO_NAME@: layout, updates, drivers and apps
+Exec=raiden-welcome
+Icon=raiden-welcome
+Terminal=false
+Categories=GNOME;GTK;Utility;
+Keywords=welcome;start;drivers;nvidia;steam;updates;getting started;
+StartupNotify=true

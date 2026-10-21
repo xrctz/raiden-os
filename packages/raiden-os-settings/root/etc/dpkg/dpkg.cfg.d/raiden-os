@@ -1,0 +1,6 @@
+# @DISTRO_NAME@ ships without Snap: keep Ubuntu's Snap-only GNOME Shell
+# extensions (from gnome-shell-ubuntu-extensions) off the system, also when
+# that package is updated. '*' also matches '/' here, so this covers the
+# directories and everything in them.
+path-exclude=/usr/share/gnome-shell/extensions/snapd-prompting@canonical.com*
+path-exclude=/usr/share/gnome-shell/extensions/snapd-search-provider@canonical.com*

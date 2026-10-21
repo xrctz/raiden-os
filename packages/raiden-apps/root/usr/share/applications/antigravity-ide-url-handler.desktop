@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Antigravity IDE - URL Handler
+Comment=Opens antigravity-ide:// links, e.g. after signing in
+Exec=/opt/antigravity-ide/antigravity-ide --open-url %U
+Icon=antigravity-ide
+Terminal=false
+NoDisplay=true
+MimeType=x-scheme-handler/antigravity-ide;
+StartupWMClass=antigravity-ide

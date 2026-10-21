@@ -1,0 +1,10 @@
+Package: raiden-os-artwork
+Version: @VERSION@
+Architecture: all
+Maintainer: @DISTRO_NAME@ <noreply@example.invalid>
+Section: misc
+Priority: optional
+Depends: plymouth, plymouth-theme-spinner, plymouth-label, hicolor-icon-theme
+Description: @DISTRO_NAME@ artwork
+ Wallpapers (light and dark variants), the logo and app icons, the animated
+ boot splash (Plymouth), the boot menu theme (GRUB) and the login screen logo.

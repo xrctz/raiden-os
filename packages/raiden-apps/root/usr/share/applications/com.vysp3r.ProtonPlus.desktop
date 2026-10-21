@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=ProtonPlus
+GenericName=Compatibility Tools Manager
+Comment=Install and update Proton-GE and other compatibility tools for Steam, Lutris and Heroic
+Exec=/opt/protonplus/AppRun
+TryExec=/opt/protonplus/AppRun
+Icon=com.vysp3r.ProtonPlus
+Terminal=false
+Categories=Game;Utility;
+Keywords=proton;wine;steam;lutris;heroic;ge;compatibility;
+StartupNotify=true
+StartupWMClass=com.vysp3r.ProtonPlus

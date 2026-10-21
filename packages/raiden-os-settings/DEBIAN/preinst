@@ -1,0 +1,9 @@
+#!/bin/sh
+set -e
+# Ship our own /usr/lib/os-release while keeping Ubuntu's copy next to it.
+# base-files updates then write to the diverted name instead of ours.
+if [ "$1" = install ] || [ "$1" = upgrade ]; then
+    dpkg-divert --package raiden-os-settings --add --rename \
+        --divert /usr/lib/os-release.ubuntu /usr/lib/os-release
+fi
+exit 0

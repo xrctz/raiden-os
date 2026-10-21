@@ -1,0 +1,14 @@
+# Almost everything here runs on Linux (inside WSL or on the built system):
+# keep LF line endings in every checkout, also on Windows with
+# core.autocrlf=true, or the shell scripts break.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.blend binary
+*.zip binary
+*.xz binary
+*.gz binary
+*.pf2 binary
+*.ttf binary
+*.otf binary

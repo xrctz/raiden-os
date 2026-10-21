@@ -1,0 +1,17 @@
+# Installed right after debootstrap. The desktop itself comes from the
+# raiden-desktop metapackage (packages/raiden-desktop) and the live/installer
+# tools from raiden-live (packages/raiden-live).
+
+# Ubuntu's own base system seeds
+ubuntu-minimal
+ubuntu-standard
+
+# initramfs-tools first, so nothing ever tries to pull dracut (casper needs initramfs-tools)
+initramfs-tools
+
+# Kernel (HWE track: newest supported kernel, signed for Secure Boot) and firmware
+linux-generic-hwe-26.04
+linux-firmware
+intel-microcode
+amd64-microcode
+firmware-sof-signed

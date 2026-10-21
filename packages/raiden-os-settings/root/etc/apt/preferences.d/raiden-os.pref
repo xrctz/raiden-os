@@ -1,0 +1,34 @@
+# @DISTRO_NAME@ package policy.
+#
+# 1. Firefox and Thunderbird in the Ubuntu archive are only wrappers that install
+#    the Snap versions. @DISTRO_NAME@ ships Google Chrome instead, and if Firefox
+#    is installed it comes as a real .deb straight from Mozilla
+#    (packages.mozilla.org), so the Ubuntu wrappers are blocked.
+# 2. Snap support, telemetry/crash-report uploaders and a few services that make
+#    no sense on a @DISTRO_NAME@ desktop are blocked so updates never pull them in.
+#    (Flatpak + Flathub is the app store backend; Snap can still be enabled later.)
+# 3. dracut is blocked because the live system and installer use initramfs-tools.
+
+Package: firefox*
+Pin: origin packages.mozilla.org
+Pin-Priority: 1000
+
+Package: firefox* thunderbird*
+Pin: release o=Ubuntu
+Pin-Priority: -1
+
+Package: snapd gnome-software-plugin-snap ubuntu-session ubuntu-settings
+Pin: version *
+Pin-Priority: -1
+
+Package: apport apport-gtk apport-core-dump-handler whoopsie ubuntu-report ubuntu-insights popularity-contest kerneloops
+Pin: version *
+Pin-Priority: -1
+
+Package: gnome-initial-setup cloud-init kdump-tools landscape-client brltty
+Pin: version *
+Pin-Priority: -1
+
+Package: dracut dracut-core
+Pin: version *
+Pin-Priority: -1

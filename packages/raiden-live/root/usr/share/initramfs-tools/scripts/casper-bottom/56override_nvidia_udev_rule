@@ -1,0 +1,16 @@
+#!/bin/sh
+# @DISTRO_NAME@: the live session ships the NVIDIA driver, so its udev rule
+# (which loads nvidia-drm for Wayland and enables GPU power management) must
+# stay active. This replaces casper's script that masked it.
+PREREQ=""
+prereqs()
+{
+	echo "$PREREQ"
+}
+case $1 in
+prereqs)
+	prereqs
+	exit 0
+	;;
+esac
+exit 0

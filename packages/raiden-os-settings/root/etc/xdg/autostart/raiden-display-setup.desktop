@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=@DISTRO_NAME@ Display Setup
+Comment=Runs monitors at their highest refresh rate and fits wallpapers to ultrawide screens
+Exec=/usr/libexec/raiden-os/display-setup
+OnlyShowIn=GNOME;
+NoDisplay=true

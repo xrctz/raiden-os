@@ -1,0 +1,16 @@
+# Dependencies of the raiden-live metapackage: live session + installer only.
+# Calamares removes raiden-live (and with it everything below that nothing
+# else needs) from the installed system.
+casper
+user-setup
+localechooser-data
+laptop-detect
+calamares
+qml6-module-qtquick
+qml6-module-qtquick-window
+qml6-module-qtquick-controls
+qml6-module-qtquick-layouts
+qt6-wayland
+x11-xserver-utils
+squashfs-tools
+rsync

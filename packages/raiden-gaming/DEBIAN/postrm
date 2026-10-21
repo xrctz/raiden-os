@@ -1,0 +1,9 @@
+#!/bin/sh
+set -e
+if [ "$1" = remove ] || [ "$1" = abort-install ] || [ "$1" = disappear ]; then
+    dpkg-divert --package raiden-gaming --remove --rename \
+        --divert /usr/share/raiden-gaming/steam.desktop.debian \
+        /usr/share/applications/steam.desktop
+    rmdir /usr/share/raiden-gaming 2>/dev/null || true
+fi
+exit 0

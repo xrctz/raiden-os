@@ -1,0 +1,10 @@
+#!/bin/sh
+# Opens a web app (Outlook, Microsoft 365) in a window of its own in Google
+# Chrome, with the Chrome profile you use every day, or in the default web
+# browser when Chrome is not installed.
+#   web-app URL
+url="${1:?usage: web-app URL}"
+if command -v google-chrome-stable >/dev/null 2>&1; then
+    exec google-chrome-stable --app="$url"
+fi
+exec xdg-open "$url"

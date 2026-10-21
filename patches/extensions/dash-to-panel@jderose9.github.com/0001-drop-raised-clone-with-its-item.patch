@@ -1,0 +1,31 @@
+Drop the raised hover clone when its taskbar item is destroyed
+
+Found on real hardware (NVIDIA RTX, GNOME 50.1): opening an app replaced a
+hovered taskbar item, its raised clone survived, and the clone's handlers ran
+on the disposed item every frame ("TaskbarItemContainer ... has been already
+disposed", three errors per frame at 120 Hz).
+
+--- a/taskbar.js
++++ b/taskbar.js
+@@ -1562,6 +1562,12 @@
+     _init() {
+       super._init()
+       this.x_expand = this.y_expand = false
++
++      // An item can be destroyed without animateOutAndDestroy(), e.g. when a
++      // favorite is replaced by its running app while hovered. Drop the raised
++      // clone with it, or the clone's handlers keep using the disposed item and
++      // the clone stays on screen.
++      this.connect('destroy', () => this._raisedClone?.destroy())
+     }
+ 
+     vfunc_allocate(box) {
+@@ -1739,7 +1745,7 @@
+         time: time,
+         transition: 'easeOutQuad',
+         onComplete: () => {
+-          if (!level) {
++          if (!level && this._raisedClone) {
+             this._raisedClone.source.opacity = 255
+             this._raisedClone.destroy()
+             delete this._raisedClone

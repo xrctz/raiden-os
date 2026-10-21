@@ -1,0 +1,11 @@
+# @DISTRO_NAME@ login screen (GDM greeter) settings
+[org/gnome/login-screen]
+logo='/usr/share/pixmaps/raiden-os-gdm-logo.png'
+
+[org/gnome/desktop/interface]
+color-scheme='prefer-dark'
+accent-color='blue'
+icon-theme='Papirus-Dark'
+cursor-theme='Adwaita'
+clock-show-weekday=true
+show-battery-percentage=true

@@ -1,0 +1,25 @@
+Clip the taskbar only when it overflows
+
+With the magnify (Plank) hover animation the icons at both ends move about a
+third of an icon outwards, and the taskbar clipped them in half (seen in the
+Raiden OS Dock layout, a dock sized to its icons). Clipping is only needed
+while the taskbar scrolls.
+
+--- a/taskbar.js
++++ b/taskbar.js
+@@ -166,6 +166,15 @@
+       upper = Math.floor(upper)
+       scrollview._dtpFadeSize = upper > pageSize ? this._delegate.iconSize : 0
+ 
++      // The magnify (Plank) animation moves the outer icons a little past the
++      // ends; only a taskbar that overflows and scrolls needs to clip them
++      let overflowing = upper > pageSize
++      let content = scrollview.get_child()
++      if (this.clip_to_allocation != overflowing)
++        this.clip_to_allocation = overflowing
++      if (content && 'clip_to_view' in content && content.clip_to_view != overflowing)
++        content.clip_to_view = overflowing
++
+       if (
+         this._currentBackgroundColor !==
+         panel.dynamicTransparency.currentBackgroundColor

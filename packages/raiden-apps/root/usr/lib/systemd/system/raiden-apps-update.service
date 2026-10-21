@@ -1,0 +1,13 @@
+[Unit]
+Description=Install missing apps and new releases of Antigravity, ProtonPlus and Heroic
+Documentation=https://antigravity.google/download https://github.com/Vysp3r/ProtonPlus/releases
+After=network-online.target
+Wants=network-online.target
+# not in the live session from the USB stick (everything there lives in RAM)
+ConditionKernelCommandLine=!boot=casper
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/raiden-os/apps-update check
+Nice=19
+IOSchedulingClass=idle

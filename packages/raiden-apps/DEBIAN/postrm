@@ -1,0 +1,15 @@
+#!/bin/sh
+set -e
+if [ "$1" = remove ] || [ "$1" = purge ]; then
+    if [ -d /run/systemd/system ]; then
+        systemctl --system daemon-reload >/dev/null 2>&1 || true
+    fi
+    # the apps were installed by apps-update, not unpacked by dpkg
+    rm -rf /opt/antigravity /opt/antigravity-ide /opt/protonplus \
+        /opt/.antigravity.* /opt/.antigravity-ide.* /opt/.protonplus.* /var/cache/raiden-apps
+fi
+if [ "$1" = purge ]; then
+    deb-systemd-helper purge raiden-apps-update.timer >/dev/null || true
+    rm -rf /var/lib/raiden-apps
+fi
+exit 0

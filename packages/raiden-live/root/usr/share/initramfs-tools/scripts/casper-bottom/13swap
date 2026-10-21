@@ -1,0 +1,17 @@
+#!/bin/sh
+# @DISTRO_NAME@: casper's version of this script switches on every Linux swap
+# partition it finds on SATA/USB disks. A disk with active swap is "in use",
+# so the installer would only offer manual partitioning for it. The live
+# session has compressed RAM swap (zram) instead; leave the disks alone.
+PREREQ=""
+prereqs()
+{
+	echo "$PREREQ"
+}
+case $1 in
+prereqs)
+	prereqs
+	exit 0
+	;;
+esac
+exit 0

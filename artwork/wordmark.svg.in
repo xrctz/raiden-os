@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="200" viewBox="0 0 820 200">
+  <defs>
+    <linearGradient id="wm-fill" x1="0.1" y1="0.05" x2="0.92" y2="0.97">
+      <stop offset="0" stop-color="#2BD9F0"/>
+      <stop offset="0.45" stop-color="#3D6BF7"/>
+      <stop offset="1" stop-color="#7B3AED"/>
+    </linearGradient>
+    <linearGradient id="wm-shine" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.30"/>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(6 6) scale(0.734)">
+    <rect x="8" y="8" width="240" height="240" rx="64" fill="url(#wm-fill)"/>
+    <rect x="8" y="8" width="240" height="240" rx="64" fill="url(#wm-shine)"/>
+    <g fill="none" stroke="#FFFFFF" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M92 188 V70 H136 A33 33 0 0 1 136 136 H92"/>
+      <path d="M128 136 L170 188"/>
+    </g>
+  </g>
+  <text x="226" y="132" font-family="Inter" font-weight="600" font-size="100" letter-spacing="-1.5" fill="@TEXT@">@NAME@</text>
+</svg>

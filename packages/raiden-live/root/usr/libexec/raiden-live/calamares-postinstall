@@ -1,0 +1,263 @@
+#!/bin/bash
+# @DISTRO_NAME@: final fix-ups of a freshly installed system.
+# Run by Calamares (shellprocess@postinstall) on the live system, with the new
+# system mounted at $1 and /proc, /sys, /dev, /run bind-mounted into it.
+set -uo pipefail
+
+ROOT="${1:?usage: calamares-postinstall TARGET_ROOT}"
+LOG=/var/log/raiden-postinstall.log
+exec > >(tee -a "$LOG") 2>&1
+
+log()  { echo "[postinstall] $*"; }
+fail() { echo "[postinstall] ERROR: $*"; exit 1; }
+in_target() {
+    chroot "$ROOT" /usr/bin/env -i HOME=/root LANG=C.UTF-8 \
+        PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+        DEBIAN_FRONTEND=noninteractive "$@"
+}
+APT=(apt-get -y -q -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold)
+
+[ -d "$ROOT/etc" ] || fail "target root $ROOT does not look like a system"
+
+# ----------------------------------------------------------- NVIDIA driver
+# The ISO ships NVIDIA's open-kernel driver (GTX 16xx / RTX 20xx and newer)
+# and, as packages to install without internet, the legacy driver for
+# Maxwell, Pascal and Volta cards (GTX 750 to GTX 10xx, Titan V). Each
+# computer ends up with the driver its card needs, or none.
+NVIDIA_BRANCH=@NVIDIA_BRANCH@
+LEGACY_POOL=/var/lib/raiden-os/nvidia-legacy
+NVIDIA_RE='^(nvidia-|libnvidia-|linux-modules-nvidia-|linux-objects-nvidia-|linux-signatures-nvidia-|xserver-xorg-video-nvidia-)'
+
+nvidia_packages() {
+    # binary:Package names the 32-bit copies (libnvidia-gl-NNN:i386) too
+    in_target dpkg-query -W -f='${binary:Package} ${Status}\n' 2>/dev/null |
+        awk '$NF == "installed" {print $1}' | grep -E "$NVIDIA_RE" || true
+}
+
+# Packages of the preinstalled driver branch only; nvidia-settings, PRIME and
+# the kernel module signatures are shared with the legacy driver and stay.
+nvidia_branch_packages() {
+    nvidia_packages | grep -E -- "-${NVIDIA_BRANCH}(-|:|\$)" || true
+}
+
+purge_nvidia() { # reason, packages...
+    local reason="$1" extra
+    shift
+    [ "$#" -gt 0 ] || return 0
+    log "removing NVIDIA driver packages: $reason"
+    # Safety: only proceed if apt would remove nothing but NVIDIA packages
+    extra=$(in_target apt-get -s purge "$@" 2>/dev/null | awk '/^Purg /{print $2}' |
+            grep -vE "$NVIDIA_RE" | grep -vE '^screen-resolution-extra' || true)
+    if [ -n "$extra" ]; then
+        log "not removing NVIDIA packages, apt would also remove: $(echo $extra)"
+        return 1
+    fi
+    in_target "${APT[@]}" purge "$@" || { log "warning: NVIDIA package removal failed"; return 1; }
+}
+
+install_nvidia_legacy() {
+    local pool="$ROOT$LEGACY_POOL" f debs="" names=""
+    [ -s "$pool/packages" ] || return 1
+    # shellcheck disable=SC2046
+    purge_nvidia "replaced by the legacy driver" $(nvidia_branch_packages) || return 1
+    for f in "$pool"/*.deb; do
+        debs="$debs $LEGACY_POOL/${f##*/}"
+        names="$names $(dpkg-deb --showformat='${Package}:${Architecture}' -W "$f" | sed 's/:\(all\|amd64\)$//')"
+    done
+    # shellcheck disable=SC2086
+    in_target "${APT[@]}" install $debs || return 1
+    # the driver counts as installed by hand, everything else as its dependencies
+    # shellcheck disable=SC2086
+    in_target apt-mark auto $names >/dev/null 2>&1 || true
+    # shellcheck disable=SC2046
+    in_target apt-mark manual $(cat "$pool/packages") >/dev/null 2>&1 || true
+}
+
+nvidia_gpus=0 nvidia_bound=0 nvidia_legacy=0 nvidia_old=0
+for dev in /sys/bus/pci/devices/*; do
+    [ "$(cat "$dev/vendor" 2>/dev/null)" = "0x10de" ] || continue
+    case "$(cat "$dev/class" 2>/dev/null)" in 0x03*) ;; *) continue ;; esac
+    nvidia_gpus=$((nvidia_gpus + 1))
+    if [ -L "$dev/driver" ] && [ "$(basename "$(readlink -f "$dev/driver")")" = nvidia ]; then
+        nvidia_bound=$((nvidia_bound + 1))
+        continue
+    fi
+    id=$(sed 's/^0x//' "$dev/device" | tr a-f A-F)
+    if grep -qx "$id" "$ROOT$LEGACY_POOL/pci-ids" 2>/dev/null; then
+        nvidia_legacy=$((nvidia_legacy + 1))
+    elif [ $((0x$id)) -lt $((0x1340)) ]; then
+        # before Maxwell (GM107, 0x1340): Kepler, Fermi and older
+        nvidia_old=$((nvidia_old + 1))
+    fi
+done
+
+mkdir -p "$ROOT/var/lib/raiden-os"
+if [ "$nvidia_gpus" -eq 0 ]; then
+    # shellcheck disable=SC2046
+    purge_nvidia "no NVIDIA graphics card in this computer" $(nvidia_packages) || true
+elif [ "$nvidia_bound" -gt 0 ]; then
+    log "NVIDIA graphics card is running the preinstalled driver; keeping it"
+elif [ "$nvidia_legacy" -gt 0 ]; then
+    if install_nvidia_legacy; then
+        log "installed the legacy NVIDIA driver ($(cat "$ROOT$LEGACY_POOL/packages"))"
+    else
+        # Fall back to the open-source driver; Welcome offers the NVIDIA
+        # driver again (it sees the card running without it).
+        log "warning: could not install the legacy NVIDIA driver"
+        # shellcheck disable=SC2046
+        purge_nvidia "the legacy driver could not be installed" $(nvidia_packages) || true
+    fi
+elif [ "$nvidia_old" -gt 0 ]; then
+    # NVIDIA no longer makes drivers for these cards; the open-source nouveau
+    # driver runs them once the NVIDIA packages (which block it) are gone.
+    # shellcheck disable=SC2046
+    purge_nvidia "this NVIDIA card is older than any current NVIDIA driver supports" $(nvidia_packages) || true
+    : > "$ROOT/var/lib/raiden-os/nvidia-too-old"
+else
+    # A card the preinstalled driver did not start in the live session (Safe
+    # Graphics mode, or a card newer than this driver): keep the driver, it
+    # starts after a normal boot or once updates add support. Welcome offers
+    # Additional Drivers while the card runs without it.
+    log "NVIDIA graphics card did not start with the preinstalled driver; keeping it"
+fi
+rm -rf "$ROOT$LEGACY_POOL"
+
+grub_changed=0
+
+# ------------------------------------------ older AMD Radeon cards (GCN 1/2)
+# Radeon HD 7000, R7/R9 200 and some R5/R7 300 cards (Southern Islands, Sea
+# Islands) start on the old "radeon" driver, which has no Vulkan, and games
+# need Vulkan (Proton for Windows games always does). The newer amdgpu
+# driver runs these cards too: switch them over. Older Radeon cards
+# (TeraScale) are supported by radeon only and stay on it.
+amd_gcn=0
+for dev in /sys/bus/pci/devices/*; do
+    [ "$(cat "$dev/vendor" 2>/dev/null)" = "0x1002" ] || continue
+    case "$(cat "$dev/class" 2>/dev/null)" in 0x03*) ;; *) continue ;; esac
+    [ "$(basename "$(readlink -f "$dev/driver" 2>/dev/null)")" = radeon ] || continue
+    if modprobe --resolve-alias "$(cat "$dev/modalias")" 2>/dev/null | grep -qx amdgpu; then
+        amd_gcn=1
+    fi
+done
+if [ "$amd_gcn" = 1 ]; then
+    mkdir -p "$ROOT/etc/default/grub.d"
+    cat > "$ROOT/etc/default/grub.d/95-raiden-amdgpu-gcn.cfg" <<'EOF'
+# Added by the @DISTRO_NAME@ installer: this computer's AMD Radeon card (GCN 1
+# or 2: Southern/Sea Islands) runs on the amdgpu driver instead of the old
+# radeon driver, for Vulkan (needed by most games and Proton).
+# To undo: delete this file and run "sudo update-grub".
+GRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT radeon.si_support=0 amdgpu.si_support=1 radeon.cik_support=0 amdgpu.cik_support=1"
+EOF
+    grub_changed=1
+    log "switched the AMD Radeon GCN 1/2 card to the amdgpu driver (Vulkan)"
+fi
+
+# ------------------------------------------------- AMD display (PSR) fix
+# Radeon RX 7600S/7700S/7600M (Navi 33) laptops such as the ASUS TUF A16
+# Advantage (FA617N*/FA617X*): Panel Self Refresh corrupts the top of the
+# built-in screen (flickering lines, stutter) and can lock it at 60 Hz, on the
+# dGPU (MUX/Ultimate mode) and the iGPU alike. Turn PSR off there. The board
+# name also catches these laptops installed while the dGPU is off (Eco mode).
+amd_psr_fix=0
+for dev in /sys/bus/pci/devices/*; do
+    [ "$(cat "$dev/vendor" 2>/dev/null)" = "0x1002" ] || continue
+    case "$(cat "$dev/device" 2>/dev/null)" in 0x748?|0x749?) amd_psr_fix=1 ;; esac
+done
+case "$(cat /sys/class/dmi/id/board_name 2>/dev/null)" in FA617N*|FA617X*) amd_psr_fix=1 ;; esac
+if [ "$amd_psr_fix" = 1 ]; then
+    mkdir -p "$ROOT/etc/default/grub.d"
+    cat > "$ROOT/etc/default/grub.d/95-raiden-amdgpu-psr.cfg" <<'EOF'
+# Added by the @DISTRO_NAME@ installer: this laptop's AMD Radeon (Navi 33)
+# display engine shows flickering lines and stutter with Panel Self Refresh.
+# To undo: delete this file and run "sudo update-grub".
+GRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT amdgpu.dcdebugmask=0x10"
+EOF
+    grub_changed=1
+    log "applied the AMD Navi 33 display fix (amdgpu.dcdebugmask=0x10)"
+fi
+if [ "$grub_changed" = 1 ]; then
+    in_target update-grub || log "warning: update-grub failed after adding graphics settings"
+fi
+
+# ------------------------------------------------- UEFI fallback boot path
+# Firmware that forgets its boot entries starts EFI/BOOT/BOOTX64.EFI. Put the
+# Microsoft-signed shim there (not plain GRUB, which Secure Boot rejects), but
+# never replace another system's fallback loader, e.g. Windows'.
+if [ -d /sys/firmware/efi ]; then
+    ESP="$ROOT/boot/efi"
+    SRC="$ESP/EFI/raiden"    # bootloader.conf: efiBootloaderId
+    if [ -f "$SRC/shimx64.efi" ] && [ -f "$SRC/grubx64.efi" ]; then
+        BOOTDIR=$(find "$ESP/EFI" -maxdepth 1 -type d -iname boot 2>/dev/null | head -n1)
+        [ -n "$BOOTDIR" ] || BOOTDIR="$ESP/EFI/BOOT"
+        existing=$(find "$BOOTDIR" -maxdepth 1 -type f -iname bootx64.efi 2>/dev/null | head -n1)
+        if [ -z "$existing" ] || [ -f "$BOOTDIR/raiden-os.fallback" ]; then
+            mkdir -p "$BOOTDIR"
+            [ -n "$existing" ] && rm -f "$existing"
+            cp "$SRC/shimx64.efi" "$BOOTDIR/BOOTX64.EFI"
+            cp "$SRC/grubx64.efi" "$BOOTDIR/grubx64.efi"
+            [ -f "$SRC/mmx64.efi" ] && cp "$SRC/mmx64.efi" "$BOOTDIR/mmx64.efi"
+            echo "Fallback boot loader installed by @DISTRO_NAME@; kept current by efi-fallback-sync." \
+                > "$BOOTDIR/raiden-os.fallback"
+            log "installed the Secure Boot capable fallback boot loader"
+        else
+            log "fallback boot loader already present (grub-install's own, or another OS's); left untouched"
+        fi
+    else
+        log "warning: shimx64.efi/grubx64.efi not found in $SRC"
+    fi
+fi
+
+# -------------------------------------------------- dual boot with Windows
+# Windows keeps the hardware clock in local time and Linux in UTC, so after
+# every switch each would show the other's clock off by the UTC offset. Where
+# Windows is installed, keep the clock in local time like Windows does (the
+# installer has just written it as UTC: write it again as local time), and add
+# "Restart into Windows" to the apps.
+windows=$(os-prober 2>/dev/null | grep -i -m1 'windows' || true)
+if [ -n "$windows" ]; then
+    printf '0.0 0 0.0\n0\nLOCAL\n' > "$ROOT/etc/adjtime"
+    hwclock --systohc --localtime 2>/dev/null || log "warning: could not write the hardware clock"
+    install -D -m644 "$ROOT/usr/share/raiden-os/restart-into-windows.desktop" \
+        "$ROOT/usr/local/share/applications/org.raidenos.RestartWindows.desktop"
+    log "Windows found (${windows%%:*}): clock kept in local time, Restart into Windows added"
+fi
+
+# ------------------------------------------------ console keyboard layout
+# Cache the console keymap so the disk-encryption password prompt at boot
+# uses the keyboard layout chosen in the installer.
+in_target setupcon --save-only >/dev/null 2>&1 || log "note: setupcon --save-only failed"
+
+# ------------------------------------------------------- live-only leftovers
+rm -f "$ROOT/etc/casper.conf"
+if in_target dpkg-query -W -f='${Status}' casper 2>/dev/null | grep -q 'ok installed'; then
+    log "casper still installed, removing it"
+    in_target "${APT[@]}" purge casper || true
+fi
+
+# --------------------------------------------------------------- initramfs
+# Rebuild the initramfs of every installed kernel and make sure none of them
+# still contains the live-boot (casper) scripts. Images without a matching
+# kernel are leftovers and are removed.
+for img in "$ROOT"/boot/initrd.img-*; do
+    [ -e "$img" ] || continue
+    ver="${img##*/initrd.img-}"
+    if [ ! -e "$ROOT/boot/vmlinuz-$ver" ]; then
+        log "removing leftover $(basename "$img")"
+        rm -f "$img"
+    fi
+done
+kernels=$(in_target linux-version list)
+[ -n "$kernels" ] || fail "no kernel installed in the target"
+for ver in $kernels; do
+    in_target update-initramfs -u -k "$ver" || fail "update-initramfs failed for $ver"
+    if in_target lsinitramfs "/boot/initrd.img-$ver" 2>/dev/null | grep -q '^scripts/casper$'; then
+        fail "initrd.img-$ver still contains the live-boot scripts"
+    fi
+done
+log "initramfs verified for: $(echo $kernels)"
+
+# ----------------------------------------------------------------- cleanup
+in_target "${APT[@]}" autoremove --purge || true
+in_target apt-get clean || true
+log "post-install steps finished"
+exit 0

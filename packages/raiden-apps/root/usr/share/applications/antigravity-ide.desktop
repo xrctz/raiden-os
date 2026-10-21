@@ -1,0 +1,19 @@
+[Desktop Entry]
+Type=Application
+Name=Antigravity IDE
+GenericName=Code Editor
+Comment=Google's AI-powered code editor
+Exec=/opt/antigravity-ide/antigravity-ide %F
+TryExec=/opt/antigravity-ide/antigravity-ide
+Icon=antigravity-ide
+Terminal=false
+Categories=Development;IDE;TextEditor;
+Keywords=google;gemini;agent;ai;code;editor;vscode;
+StartupWMClass=antigravity-ide
+StartupNotify=true
+Actions=new-empty-window;
+
+[Desktop Action new-empty-window]
+Name=New Empty Window
+Exec=/opt/antigravity-ide/antigravity-ide --new-window %F
+Icon=antigravity-ide

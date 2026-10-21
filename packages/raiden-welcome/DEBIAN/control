@@ -1,0 +1,12 @@
+Package: raiden-welcome
+Version: @VERSION@
+Architecture: all
+Maintainer: @DISTRO_NAME@ <noreply@example.invalid>
+Section: gnome
+Priority: optional
+Depends: python3, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, pciutils, raiden-os-artwork
+Recommends: raiden-appearance, gnome-software, update-manager, software-properties-gtk
+Description: Welcome app for @DISTRO_NAME@
+ Shown at the first login: choose a desktop layout, install updates, check
+ the graphics driver (NVIDIA, AMD or Intel), find the games, school and AI
+ apps, and set up backups, snapshots and the firewall.

@@ -1,0 +1,13 @@
+Package: raiden-desktop
+Version: @VERSION@
+Architecture: all
+Maintainer: @DISTRO_NAME@ <noreply@example.invalid>
+Section: metapackages
+Priority: optional
+Depends: @DESKTOP_DEPENDS@, raiden-os-settings, raiden-os-artwork, raiden-gnome-extensions, raiden-adw-gtk3-theme, raiden-appearance, raiden-welcome, linux-@KERNEL_FLAVOUR@
+Recommends: @DESKTOP_RECOMMENDS@
+Description: @DISTRO_NAME@ desktop system
+ This metapackage pulls in everything that makes up @DISTRO_NAME@: the GNOME
+ desktop with its layouts, apps, drivers, codecs, printing, power management
+ and the newest supported kernel. Keep it installed so future updates can add
+ new components.

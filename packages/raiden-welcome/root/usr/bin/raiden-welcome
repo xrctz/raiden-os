@@ -1,0 +1,9 @@
+#!/usr/bin/python3
+"""@DISTRO_NAME@ Welcome (raiden-welcome [--autostart])."""
+import sys
+
+sys.path.insert(0, "/usr/share/raiden-welcome")
+
+from raiden_welcome import main  # noqa: E402
+
+sys.exit(main())

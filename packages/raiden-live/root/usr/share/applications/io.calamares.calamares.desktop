@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Install @DISTRO_NAME@
+Exec=raiden-install
+Icon=raiden-os-installer
+NoDisplay=true

@@ -1,0 +1,8 @@
+#!/bin/sh
+set -e
+if [ "$1" = remove ] || [ "$1" = abort-install ] || [ "$1" = disappear ]; then
+    dpkg-divert --package raiden-os-settings --remove --rename \
+        --divert /usr/lib/os-release.ubuntu /usr/lib/os-release
+    rm -f /usr/local/share/applications/org.raidenos.RestartWindows.desktop
+fi
+exit 0

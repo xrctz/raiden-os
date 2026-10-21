@@ -1,0 +1,14 @@
+#!/usr/bin/python3
+"""@DISTRO_NAME@ Appearance: desktop layouts, style and effects.
+
+    raiden-appearance                  open the app
+    raiden-appearance --layout NAME    apply a layout (windows, modern, macos, ubuntu, gnome)
+    raiden-appearance --current-layout print the active layout
+"""
+import sys
+
+sys.path.insert(0, "/usr/share/raiden-appearance")
+
+from raiden_appearance.app import main  # noqa: E402
+
+sys.exit(main())

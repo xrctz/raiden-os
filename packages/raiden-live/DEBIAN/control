@@ -1,0 +1,12 @@
+Package: raiden-live
+Version: @VERSION@
+Architecture: all
+Maintainer: @DISTRO_NAME@ <noreply@example.invalid>
+Section: admin
+Priority: optional
+Depends: @LIVE_DEPENDS@, raiden-os-artwork, python3, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, sudo, procps, dbus-bin, init-system-helpers
+Description: @DISTRO_NAME@ live session and installer
+ Everything that is only needed on the installation media: the live-boot
+ system (casper), the Calamares installer with @DISTRO_NAME@ configuration
+ and branding, the "Try or Install" prompt and the installer launcher.
+ The installer removes this package from the installed system.

@@ -1,0 +1,26 @@
+#!/bin/sh
+set -e
+if [ "$1" = configure ]; then
+    # Claude's Cowork tasks run in a virtual machine, which needs the "kvm"
+    # group. The installer adds new users to it; on a first install of this
+    # package the administrators of an existing system join it once.
+    if [ -z "$2" ] && getent group kvm >/dev/null; then
+        for u in $(getent group sudo | cut -d: -f4 | tr ',' ' '); do
+            adduser --quiet "$u" kvm || true
+        done
+    fi
+    deb-systemd-helper enable raiden-apps-update.timer >/dev/null || true
+    if [ -d /run/systemd/system ]; then
+        systemctl --system daemon-reload >/dev/null 2>&1 || true
+        deb-systemd-invoke start raiden-apps-update.timer >/dev/null 2>&1 || true
+        # On a running system that lacks some of the apps (the public
+        # edition, or a system installed before they existed), install them
+        # now, in the background.
+        if [ ! -x /opt/antigravity/antigravity ] || [ ! -x /opt/antigravity-ide/antigravity-ide ] ||
+           [ ! -x /opt/protonplus/AppRun ] || [ ! -x /opt/google/chrome/chrome ] ||
+           [ ! -x /usr/lib/claude-desktop/claude-desktop ]; then
+            systemctl start --no-block raiden-apps-update.service >/dev/null 2>&1 || true
+        fi
+    fi
+fi
+exit 0

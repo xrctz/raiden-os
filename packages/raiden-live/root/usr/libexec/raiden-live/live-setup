@@ -1,0 +1,56 @@
+#!/bin/bash
+# @DISTRO_NAME@ live session tweaks (runs only when booted from the ISO).
+# Everything lives in RAM and disappears at shutdown.
+set -u
+. /etc/casper.conf 2>/dev/null || true
+LIVE_USER="${USERNAME:-live}"
+HOME_DIR="/home/$LIVE_USER"
+
+# Live-only desktop defaults: installer pinned first, no screen lock or sleep
+cat > /usr/share/glib-2.0/schemas/zz-raiden-live.gschema.override <<'EOF'
+[org.gnome.shell]
+favorite-apps=['raiden-os-installer.desktop', 'google-chrome.desktop', 'org.gnome.Nautilus.desktop', 'org.gnome.Software.desktop', 'org.gnome.Ptyxis.desktop', 'org.gnome.Settings.desktop']
+
+[org.gnome.shell.extensions.arcmenu]
+pinned-apps=[{'id': 'raiden-os-installer.desktop'}, {'id': 'google-chrome.desktop'}, {'id': 'org.gnome.Nautilus.desktop'}, {'id': 'org.gnome.Ptyxis.desktop'}, {'id': 'org.gnome.Settings.desktop'}, {'id': 'org.raidenos.Appearance.desktop'}, {'id': 'org.gnome.DiskUtility.desktop'}]
+
+[org.gnome.desktop.screensaver]
+lock-enabled=false
+
+[org.gnome.desktop.lockdown]
+disable-lock-screen=true
+
+[org.gnome.desktop.session]
+idle-delay=uint32 0
+
+[org.gnome.settings-daemon.plugins.power]
+sleep-inactive-ac-type='nothing'
+sleep-inactive-battery-type='nothing'
+idle-dim=false
+
+# Don't mount drives on its own: a disk with a mounted partition is "in use"
+# and the installer then only offers manual partitioning for it. Drives still
+# show up in Files and open with a click.
+[org.gnome.desktop.media-handling]
+automount=false
+automount-open=false
+EOF
+# The public edition has Firefox instead of Chrome
+if [ ! -e /usr/share/applications/google-chrome.desktop ]; then
+  sed -i 's/google-chrome\.desktop/firefox.desktop/g' /usr/share/glib-2.0/schemas/zz-raiden-live.gschema.override
+fi
+glib-compile-schemas /usr/share/glib-2.0/schemas/ 2>/dev/null
+
+# "Install @DISTRO_NAME@" icon on the desktop, already trusted (no warning)
+if id "$LIVE_USER" >/dev/null 2>&1 && [ -d "$HOME_DIR" ]; then
+    install -d -o "$LIVE_USER" -g "$LIVE_USER" "$HOME_DIR/Desktop"
+    install -o "$LIVE_USER" -g "$LIVE_USER" -m 755 \
+        /usr/share/applications/raiden-os-installer.desktop "$HOME_DIR/Desktop/"
+    runuser -u "$LIVE_USER" -- dbus-run-session -- \
+        gio set "$HOME_DIR/Desktop/raiden-os-installer.desktop" metadata::trusted true \
+        >/dev/null 2>&1 || true
+    # The Welcome app is for installed systems; the live session has its own prompt
+    install -d -o "$LIVE_USER" -g "$LIVE_USER" "$HOME_DIR/.config/raiden-welcome"
+    runuser -u "$LIVE_USER" -- touch "$HOME_DIR/.config/raiden-welcome/first-run-done"
+fi
+exit 0

@@ -1,0 +1,110 @@
+#!/usr/bin/python3
+"""Live session greeter: try @DISTRO_NAME@ or start the installer."""
+import os
+import sys
+
+import gi
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
+
+HERO = "/usr/share/pixmaps/raiden-os-emblem-3d.png"
+CSS = """
+.prompt-title { font-size: 2em; font-weight: 800; }
+.choice { padding: 18px 22px; border-radius: 18px; }
+.choice-title { font-weight: 700; font-size: 1.15em; }
+"""
+
+
+def live_session():
+    try:
+        with open("/proc/cmdline") as f:
+            return "boot=casper" in f.read().split()
+    except OSError:
+        return False
+
+
+class Prompt(Adw.ApplicationWindow):
+    def __init__(self, app):
+        super().__init__(application=app, title="Welcome", resizable=False)
+        self.set_default_size(640, -1)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18, margin_top=28,
+                      margin_bottom=28, margin_start=32, margin_end=32)
+        if os.path.exists(HERO):
+            # Gtk.Image scales to pixel_size; a Gtk.Picture would ask for the
+            # PNG's full 512 px and blow the window up
+            pic = Gtk.Image.new_from_file(HERO)
+            pic.set_pixel_size(128)
+            pic.set_halign(Gtk.Align.CENTER)
+            box.append(pic)
+        title = Gtk.Label(label="Welcome to @DISTRO_NAME@")
+        title.add_css_class("prompt-title")
+        box.append(title)
+        sub = Gtk.Label(label="You can try @DISTRO_NAME@ without changing your computer, "
+                              "or install it now. You can also start the installer later "
+                              "from the icon on the desktop.", wrap=True, justify=Gtk.Justification.CENTER,
+                        max_width_chars=60)
+        sub.add_css_class("dim-label")
+        box.append(sub)
+
+        row = Gtk.Box(spacing=16, homogeneous=True, margin_top=8)
+        row.append(self._choice("Try @DISTRO_NAME@", "Look around first",
+                                "media-playback-start-symbolic", self._try))
+        install = self._choice("Install @DISTRO_NAME@", "Install on this computer",
+                               "raiden-os-installer", self._install)
+        install.add_css_class("suggested-action")
+        row.append(install)
+        box.append(row)
+
+        hb = Adw.HeaderBar(show_title=False)
+        view = Adw.ToolbarView()
+        view.add_top_bar(hb)
+        view.set_content(box)
+        self.set_content(view)
+
+    def _choice(self, title, subtitle, icon, cb):
+        btn = Gtk.Button()
+        btn.add_css_class("choice")
+        inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        inner.append(Gtk.Image(icon_name=icon, pixel_size=48))
+        t = Gtk.Label(label=title)
+        t.add_css_class("choice-title")
+        inner.append(t)
+        s = Gtk.Label(label=subtitle)
+        s.add_css_class("dim-label")
+        inner.append(s)
+        btn.set_child(inner)
+        btn.connect("clicked", lambda *_: cb())
+        return btn
+
+    def _try(self):
+        self.close()
+
+    def _install(self):
+        try:
+            Gio.Subprocess.new(["raiden-install"], Gio.SubprocessFlags.NONE)
+        except GLib.Error:
+            pass
+        self.close()
+
+
+class App(Adw.Application):
+    def __init__(self):
+        super().__init__(application_id="org.raidenos.LivePrompt")
+
+    def do_startup(self):
+        Adw.Application.do_startup(self)
+        provider = Gtk.CssProvider()
+        provider.load_from_string(CSS)
+        Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), provider,
+                                                  Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
+    def do_activate(self):
+        Prompt(self).present()
+
+
+if __name__ == "__main__":
+    if not live_session() and "--force" not in sys.argv:
+        sys.exit(0)
+    sys.exit(App().run([sys.argv[0]]))

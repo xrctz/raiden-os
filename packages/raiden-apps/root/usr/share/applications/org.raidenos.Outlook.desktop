@@ -1,0 +1,21 @@
+[Desktop Entry]
+Type=Application
+Name=Outlook
+GenericName=Mail and Calendar
+Comment=Microsoft Outlook mail and calendar, for school, work and personal accounts
+Exec=/usr/libexec/raiden-os/web-app https://outlook.office.com/mail/
+Icon=ms-outlook
+Terminal=false
+Categories=Office;Email;Calendar;Network;
+Keywords=mail;email;calendar;microsoft;office;exchange;hotmail;school;college;
+StartupNotify=true
+StartupWMClass=chrome-outlook.office.com__mail_-Default
+Actions=Compose;Calendar;
+
+[Desktop Action Compose]
+Name=New Email
+Exec=/usr/libexec/raiden-os/web-app https://outlook.office.com/mail/deeplink/compose
+
+[Desktop Action Calendar]
+Name=Calendar
+Exec=/usr/libexec/raiden-os/web-app https://outlook.office.com/calendar/

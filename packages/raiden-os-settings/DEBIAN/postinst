@@ -1,0 +1,29 @@
+#!/bin/sh
+set -e
+if [ "$1" = configure ]; then
+    # GDM compiles its greeter settings (logo, colours) from /usr/share/gdm/dconf
+    if [ -x /usr/share/gdm/generate-config ] && getent passwd gdm >/dev/null; then
+        /usr/share/gdm/generate-config >/dev/null 2>&1 || true
+    fi
+    # Apply the zram and sysctl settings right away on a running system
+    if [ -d /run/systemd/system ]; then
+        systemctl daemon-reload >/dev/null 2>&1 || true
+        sysctl --system >/dev/null 2>&1 || true
+    fi
+    # Dual boot with Windows on a system installed before the installer did
+    # this itself: if the boot menu lists Windows, keep the hardware clock in
+    # local time like Windows does (once; a later choice is respected) and
+    # offer "Restart into Windows".
+    if [ -f /boot/grub/grub.cfg ] && grep -q "^menuentry 'Windows" /boot/grub/grub.cfg; then
+        mark=/var/lib/raiden-os/dual-boot-clock
+        if [ ! -e "$mark" ] && [ -d /run/systemd/system ]; then
+            if [ ! -f /etc/adjtime ] || [ "$(sed -n 3p /etc/adjtime)" = UTC ]; then
+                timedatectl set-local-rtc 1 >/dev/null 2>&1 || true
+            fi
+            mkdir -p /var/lib/raiden-os && touch "$mark"
+        fi
+        install -D -m644 /usr/share/raiden-os/restart-into-windows.desktop \
+            /usr/local/share/applications/org.raidenos.RestartWindows.desktop
+    fi
+fi
+exit 0

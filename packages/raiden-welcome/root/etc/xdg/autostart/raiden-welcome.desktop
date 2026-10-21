@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Welcome to @DISTRO_NAME@
+Exec=raiden-welcome --autostart
+Icon=raiden-welcome
+OnlyShowIn=GNOME;
+NoDisplay=true

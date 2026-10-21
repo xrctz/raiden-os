@@ -1,0 +1,33 @@
+[Desktop Entry]
+Type=Application
+Name=Microsoft 365
+GenericName=Office Apps
+Comment=Word, Excel, PowerPoint, OneDrive and Teams, for school, work and personal accounts
+Exec=/usr/libexec/raiden-os/web-app https://m365.cloud.microsoft/
+Icon=microsoft-365
+Terminal=false
+Categories=Office;
+Keywords=word;excel;powerpoint;onedrive;teams;onenote;office;microsoft;school;college;
+StartupNotify=true
+StartupWMClass=chrome-m365.cloud.microsoft__-Default
+Actions=Word;Excel;PowerPoint;OneDrive;Teams;
+
+[Desktop Action Word]
+Name=Word
+Exec=/usr/libexec/raiden-os/web-app https://www.office.com/launch/word
+
+[Desktop Action Excel]
+Name=Excel
+Exec=/usr/libexec/raiden-os/web-app https://www.office.com/launch/excel
+
+[Desktop Action PowerPoint]
+Name=PowerPoint
+Exec=/usr/libexec/raiden-os/web-app https://www.office.com/launch/powerpoint
+
+[Desktop Action OneDrive]
+Name=OneDrive
+Exec=/usr/libexec/raiden-os/web-app https://www.office.com/launch/onedrive
+
+[Desktop Action Teams]
+Name=Teams
+Exec=/usr/libexec/raiden-os/web-app https://teams.microsoft.com/

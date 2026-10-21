@@ -1,0 +1,23 @@
+#!/bin/sh
+# Keep the firmware fallback boot path (EFI/BOOT/BOOTX64.EFI) identical to the
+# installed shim and GRUB after updates. Only touches ESPs where the @DISTRO_NAME@
+# installer placed that fallback itself (marked by a small file), so a
+# Windows boot loader on a shared ESP is never modified.
+ESP=/boot/efi
+BOOTDIR="$ESP/EFI/BOOT"
+[ -f "$BOOTDIR/raiden-os.fallback" ] || exit 0
+SRC=""
+for d in "$ESP/EFI/raiden" "$ESP/EFI/ubuntu"; do
+    if [ -f "$d/shimx64.efi" ] && [ -f "$d/grubx64.efi" ]; then SRC="$d"; break; fi
+done
+[ -n "$SRC" ] || exit 0
+
+sync_file() {
+    if ! cmp -s "$1" "$2"; then
+        cp "$1" "$2.new" && mv "$2.new" "$2"
+    fi
+}
+sync_file "$SRC/shimx64.efi" "$BOOTDIR/BOOTX64.EFI"
+sync_file "$SRC/grubx64.efi" "$BOOTDIR/grubx64.efi"
+[ -f "$SRC/mmx64.efi" ] && sync_file "$SRC/mmx64.efi" "$BOOTDIR/mmx64.efi"
+exit 0

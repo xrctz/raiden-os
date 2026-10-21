@@ -1,0 +1,34 @@
+[Desktop Entry]
+Name=Steam
+Comment=Application for managing and playing games on Steam
+Exec=/usr/games/steam %U
+TryExec=/usr/games/steam
+Icon=steam
+Terminal=false
+Type=Application
+Categories=Network;FileTransfer;Game;
+MimeType=x-scheme-handler/steam;x-scheme-handler/steamlink;
+Actions=Store;Library;Friends;BigPicture;Settings;
+Keywords=games;steam;valve;proton;
+PrefersNonDefaultGPU=true
+X-KDE-RunOnDiscreteGpu=true
+
+[Desktop Action Store]
+Name=Store
+Exec=/usr/games/steam steam://store
+
+[Desktop Action Library]
+Name=Library
+Exec=/usr/games/steam steam://open/games
+
+[Desktop Action Friends]
+Name=Friends
+Exec=/usr/games/steam steam://open/friends
+
+[Desktop Action BigPicture]
+Name=Big Picture
+Exec=/usr/games/steam steam://open/bigpicture
+
+[Desktop Action Settings]
+Name=Settings
+Exec=/usr/games/steam steam://open/settings

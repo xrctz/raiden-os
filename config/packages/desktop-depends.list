@@ -1,0 +1,96 @@
+# Hard dependencies of the raiden-desktop metapackage: the core system.
+# Removing any of these would break the desktop, so they are Depends.
+
+# GNOME desktop core
+gnome-shell
+gdm3
+gnome-session
+gnome-control-center
+gnome-settings-daemon
+gnome-shell-ubuntu-extensions
+gnome-menus
+gnome-keyring
+libpam-gnome-keyring
+gnome-session-canberra
+nautilus
+xdg-desktop-portal-gnome
+xdg-desktop-portal-gtk
+xdg-user-dirs
+xdg-user-dirs-gtk
+xdg-utils
+xdg-terminal-exec
+policykit-desktop-privileges
+at-spi2-core
+libatk-adaptor
+zenity
+libnotify-bin
+yelp
+gnome-user-docs
+
+# Look and feel
+adwaita-icon-theme
+papirus-icon-theme
+fonts-adwaita
+fonts-inter
+fonts-dejavu-core
+fontconfig
+plymouth
+plymouth-label
+
+# Sound and video
+pipewire-audio
+pipewire-pulse
+wireplumber
+alsa-utils
+gstreamer1.0-alsa
+gstreamer1.0-pipewire
+gstreamer1.0-packagekit
+gstreamer1.0-plugins-base-apps
+
+# Networking
+network-manager
+wpasupplicant
+iw
+rfkill
+
+# Software and updates
+software-properties-common
+software-properties-gtk
+ubuntu-drivers-common
+update-manager
+update-notifier
+unattended-upgrades
+packagekit
+appstream
+flatpak
+gnome-software
+gnome-software-plugin-flatpak
+language-selector-common
+language-selector-gnome
+
+# Power, battery and hardware management
+power-profiles-daemon
+upower
+switcheroo-control
+systemd-zram-generator
+bolt
+iio-sensor-proxy
+
+# Boot loader (BIOS + UEFI Secure Boot) and disk tools needed by the installed system
+grub-efi-amd64-signed
+shim-signed
+grub-pc | grub-efi-amd64
+grub-pc-bin
+grub-efi-amd64-bin
+efibootmgr
+mokutil
+secureboot-db
+os-prober
+cryptsetup
+cryptsetup-initramfs
+btrfs-progs
+xfsprogs
+dosfstools
+exfatprogs
+ntfs-3g
+initramfs-tools

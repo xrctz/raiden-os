@@ -1,0 +1,166 @@
+# @DISTRO_NAME@ desktop defaults.
+#
+# These are only defaults: every user can change them in Settings or in the
+# Appearance app, which switches between complete desktop layouts.
+# The default layout is "Windows-like": a bottom taskbar (Dash to Panel) with
+# a start menu (ArcMenu) opened by the logo button or the Super key.
+
+[org.gnome.desktop.interface]
+color-scheme='prefer-dark'
+accent-color='blue'
+gtk-theme='adw-gtk3-dark'
+icon-theme='Papirus-Dark'
+cursor-theme='Adwaita'
+clock-show-weekday=true
+show-battery-percentage=true
+enable-hot-corners=false
+
+[org.gnome.desktop.wm.preferences]
+button-layout='appmenu:minimize,maximize,close'
+
+[org.gnome.mutter]
+center-new-windows=true
+dynamic-workspaces=true
+edge-tiling=true
+
+# Ubuntu's defaults name features that GNOME 50 no longer has (fractional
+# scaling is built in now), which only logs "Unknown experimental feature" at
+# every start. Ubuntu sets them for the GNOME desktop only, and such sections
+# win over plain ones, so the fix has to be desktop-specific too.
+[org.gnome.mutter:GNOME]
+experimental-features=@as []
+
+[org.gnome.desktop.background]
+picture-uri='file:///usr/share/backgrounds/raiden-os/aurora-light.jpg'
+picture-uri-dark='file:///usr/share/backgrounds/raiden-os/aurora-dark.jpg'
+picture-options='zoom'
+primary-color='#0b1020'
+secondary-color='#0b1020'
+color-shading-type='solid'
+
+[org.gnome.desktop.screensaver]
+picture-uri='file:///usr/share/backgrounds/raiden-os/aurora-dark.jpg'
+picture-options='zoom'
+primary-color='#0b1020'
+secondary-color='#0b1020'
+
+[org.gnome.shell]
+enabled-extensions=['dash-to-panel@jderose9.github.com', 'arcmenu@arcmenu.com', 'blur-my-shell@aunetx', 'ubuntu-appindicators@ubuntu.com', 'ding@rastersoft.com', 'tiling-assistant@ubuntu.com', 'gsconnect@andyholmes.github.io', 'burn-my-windows@schneegans.github.com', 'compiz-windows-effect@hermes83.github.com', 'compiz-alike-magic-lamp-effect@hermes83.github.com']
+favorite-apps=['google-chrome.desktop', 'org.gnome.Nautilus.desktop', 'org.raidenos.Outlook.desktop', 'libreoffice-writer.desktop', 'steam.desktop', 'com.anthropic.Claude.desktop', 'antigravity.desktop', 'org.gnome.Software.desktop', 'org.gnome.Ptyxis.desktop', 'org.gnome.Settings.desktop']
+welcome-dialog-last-shown-version='999'
+
+# ---------------------------------------------------------------- taskbar
+[org.gnome.shell.extensions.dash-to-panel]
+panel-position='BOTTOM'
+panel-size=48
+panel-element-positions='{"0":[{"element":"showAppsButton","visible":false,"position":"stackedTL"},{"element":"activitiesButton","visible":false,"position":"stackedTL"},{"element":"leftBox","visible":true,"position":"stackedTL"},{"element":"taskbar","visible":true,"position":"stackedTL"},{"element":"centerBox","visible":true,"position":"stackedBR"},{"element":"rightBox","visible":true,"position":"stackedBR"},{"element":"dateMenu","visible":true,"position":"stackedBR"},{"element":"systemMenu","visible":true,"position":"stackedBR"},{"element":"desktopButton","visible":true,"position":"stackedBR"}],"1":[{"element":"showAppsButton","visible":false,"position":"stackedTL"},{"element":"activitiesButton","visible":false,"position":"stackedTL"},{"element":"leftBox","visible":true,"position":"stackedTL"},{"element":"taskbar","visible":true,"position":"stackedTL"},{"element":"centerBox","visible":true,"position":"stackedBR"},{"element":"rightBox","visible":true,"position":"stackedBR"},{"element":"dateMenu","visible":true,"position":"stackedBR"},{"element":"systemMenu","visible":true,"position":"stackedBR"},{"element":"desktopButton","visible":true,"position":"stackedBR"}],"2":[{"element":"showAppsButton","visible":false,"position":"stackedTL"},{"element":"activitiesButton","visible":false,"position":"stackedTL"},{"element":"leftBox","visible":true,"position":"stackedTL"},{"element":"taskbar","visible":true,"position":"stackedTL"},{"element":"centerBox","visible":true,"position":"stackedBR"},{"element":"rightBox","visible":true,"position":"stackedBR"},{"element":"dateMenu","visible":true,"position":"stackedBR"},{"element":"systemMenu","visible":true,"position":"stackedBR"},{"element":"desktopButton","visible":true,"position":"stackedBR"}],"3":[{"element":"showAppsButton","visible":false,"position":"stackedTL"},{"element":"activitiesButton","visible":false,"position":"stackedTL"},{"element":"leftBox","visible":true,"position":"stackedTL"},{"element":"taskbar","visible":true,"position":"stackedTL"},{"element":"centerBox","visible":true,"position":"stackedBR"},{"element":"rightBox","visible":true,"position":"stackedBR"},{"element":"dateMenu","visible":true,"position":"stackedBR"},{"element":"systemMenu","visible":true,"position":"stackedBR"},{"element":"desktopButton","visible":true,"position":"stackedBR"}]}'
+stockgs-keep-top-panel=false
+hide-overview-on-startup=true
+show-activities-button=false
+trans-use-custom-opacity=true
+trans-panel-opacity=0.55
+# Icons rise with a little tilt and their neighbours follow (Ripple); the
+# Dock layout switches to Magnify (PLANK), like macOS
+animate-appicon-hover=true
+animate-appicon-hover-animation-type='RIPPLE'
+animate-appicon-hover-animation-zoom={'SIMPLE': 1.0, 'RIPPLE': 1.3, 'PLANK': 1.7}
+animate-appicon-hover-animation-convexity={'RIPPLE': 2.0, 'PLANK': 1.4}
+animate-app-switch=true
+animate-window-launch=true
+highlight-appicon-hover-border-radius=8
+showdesktop-button-width=6
+group-apps=true
+show-window-previews=true
+dot-style-focused='METRO'
+dot-style-unfocused='METRO'
+# running-app indicators take each icon's own colour
+dot-color-dominant=true
+
+# ------------------------------------------------------------- start menu
+[org.gnome.shell.extensions.arcmenu]
+menu-layout='arcmenu'
+menu-button-icon='raiden-os-logo'
+menu-button-icon-size=26
+position-in-panel='Left'
+hide-overview-on-startup=true
+update-notifier-enabled=false
+show-user-avatar=true
+pinned-apps=[{'id': 'google-chrome.desktop'}, {'id': 'org.gnome.Nautilus.desktop'}, {'id': 'org.raidenos.Outlook.desktop'}, {'id': 'org.raidenos.Microsoft365.desktop'}, {'id': 'libreoffice-writer.desktop'}, {'id': 'org.gnome.Papers.desktop'}, {'id': 'steam.desktop'}, {'id': 'heroic.desktop'}, {'id': 'com.vysp3r.ProtonPlus.desktop'}, {'id': 'com.anthropic.Claude.desktop'}, {'id': 'antigravity.desktop'}, {'id': 'antigravity-ide.desktop'}, {'id': 'org.gnome.Software.desktop'}, {'id': 'org.gnome.Ptyxis.desktop'}, {'id': 'org.gnome.TextEditor.desktop'}, {'id': 'org.gnome.Settings.desktop'}, {'id': 'org.raidenos.Appearance.desktop'}, {'id': 'org.raidenos.Welcome.desktop'}]
+
+# ------------------------------------------------------- glass/blur effects
+[org.gnome.shell.extensions.blur-my-shell.panel]
+blur=true
+static-blur=true
+override-background=true
+
+[org.gnome.shell.extensions.blur-my-shell.dash-to-dock]
+blur=true
+static-blur=true
+override-background=true
+
+[org.gnome.shell.extensions.blur-my-shell.applications]
+blur=false
+
+# --------------------------------------------- window open/close effects
+# theme-sync writes the effect profiles to match the character theme
+[org.gnome.shell.extensions.burn-my-windows]
+show-support-dialog=false
+
+# ----------------------------------------- dock (used by the macOS-like layout)
+[org.gnome.shell.extensions.dash-to-dock]
+dock-position='BOTTOM'
+extend-height=false
+dock-fixed=false
+autohide=true
+intellihide=true
+intellihide-mode='FOCUS_APPLICATION_WINDOWS'
+dash-max-icon-size=52
+show-trash=true
+show-mounts=false
+show-apps-at-top=false
+click-action='minimize-or-previews'
+scroll-action='cycle-windows'
+running-indicator-style='DOTS'
+transparency-mode='DYNAMIC'
+custom-theme-shrink=true
+disable-overview-on-startup=true
+
+# ------------------------------------------------------------ desktop icons
+[org.gnome.shell.extensions.ding]
+show-home=true
+show-trash=true
+show-volumes=true
+start-corner='top-left'
+icon-size='standard'
+
+# ------------------------------------------------------------ power/battery
+[org.gnome.settings-daemon.plugins.power]
+sleep-inactive-ac-type='nothing'
+sleep-inactive-battery-type='suspend'
+sleep-inactive-battery-timeout=1200
+power-saver-profile-on-low-battery=true
+
+[org.gnome.desktop.sound]
+allow-volume-above-100-percent=true
+
+# ------------------------------------------------------------------ privacy
+[org.gnome.desktop.privacy]
+report-technical-problems=false
+send-software-usage-stats=false
+
+# ----------------------------------------------------------------- terminal
+# Neutral GNOME palette (follows light/dark) instead of Ubuntu's aubergine one
+[org.gnome.Ptyxis.Profile]
+palette='gnome'
+
+# ------------------------------------------------------------- file chooser
+[org.gtk.gtk4.Settings.FileChooser]
+sort-directories-first=true
+
+[org.gtk.Settings.FileChooser]
+sort-directories-first=true
+
+# --------------------------------------------------------------- app store
+[org.gnome.software]
+packaging-format-preference=['flatpak:flathub', 'deb']
+first-run=false
