@@ -9,5 +9,9 @@ ConditionKernelCommandLine=!boot=casper
 [Service]
 Type=oneshot
 ExecStart=/usr/libexec/raiden-os/apps-update check
-Nice=19
-IOSchedulingClass=idle
+# Low priority, but not "idle" I/O: right after installing, the disk is busy
+# for a long time (updates, file indexing, Steam), and idle I/O made the first
+# downloads of Chrome, Claude and Antigravity crawl
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

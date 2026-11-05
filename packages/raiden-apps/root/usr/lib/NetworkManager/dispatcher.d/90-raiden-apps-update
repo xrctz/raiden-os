@@ -1,0 +1,15 @@
+#!/bin/sh
+# @DISTRO_NAME@: when the computer goes online, install the apps that are
+# still on their way (Chrome, Claude, Antigravity... on a new install) right
+# away, instead of waiting for the daily timer or the next restart.
+case "$2" in
+    up|connectivity-change) ;;
+    *) exit 0 ;;
+esac
+[ "$2" = connectivity-change ] && [ "$CONNECTIVITY_STATE" != FULL ] && exit 0
+grep -qw 'boot=casper' /proc/cmdline 2>/dev/null && exit 0   # live USB session
+[ -x /usr/libexec/raiden-os/apps-update ] || exit 0
+if /usr/libexec/raiden-os/apps-update pending; then
+    systemctl start --no-block raiden-apps-update.service >/dev/null 2>&1 || true
+fi
+exit 0

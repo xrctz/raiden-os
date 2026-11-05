@@ -61,7 +61,7 @@ fix_permissions() {
   local d="$1"
   find "$d" -type d -exec chmod 755 {} +
   find "$d" -type f -exec chmod 644 {} +
-  for x in usr/bin usr/libexec usr/share/initramfs-tools/scripts; do
+  for x in usr/bin usr/libexec usr/share/initramfs-tools/scripts usr/lib/NetworkManager/dispatcher.d; do
     [ -d "$d/$x" ] && find "$d/$x" -type f -exec chmod 755 {} +
   done
   for s in preinst postinst prerm postrm config; do

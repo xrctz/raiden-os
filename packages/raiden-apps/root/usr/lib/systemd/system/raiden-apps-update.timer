@@ -2,9 +2,10 @@
 Description=Install missing apps and new releases of Antigravity, ProtonPlus and Heroic
 
 [Timer]
-# A few minutes after every start (apps missing from the ISO arrive as soon
-# as the computer is online), then every day it stays on
-OnBootSec=3min
+# Soon after every start (apps missing from the ISO arrive as soon as the
+# computer is online; NetworkManager also starts it when it goes online), then
+# every day it stays on
+OnBootSec=1min
 OnUnitActiveSec=1d
 RandomizedDelaySec=10min
 
