@@ -5,7 +5,7 @@ Maintainer: @DISTRO_NAME@ <noreply@example.invalid>
 Section: misc
 Priority: optional
 Depends: python3, ca-certificates, util-linux, adduser, desktop-file-utils
-Recommends: google-chrome-stable, papirus-icon-theme
+Recommends: google-chrome-stable, papirus-icon-theme, libnotify-bin, network-manager
 Description: Third-party apps for @DISTRO_NAME@
  Installs the apps whose makers publish Linux versions only as downloads,
  with launchers, and keeps them current: a timer installs new releases

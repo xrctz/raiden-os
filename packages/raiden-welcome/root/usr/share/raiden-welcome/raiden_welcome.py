@@ -20,6 +20,7 @@ NVIDIA_TOO_OLD_FLAG = "/var/lib/raiden-os/nvidia-too-old"
 # Apps the public edition gets on the first start with internet (raiden-apps
 # keeps a file per app it has installed in APPS_STATE)
 APPS_STATE = "/var/lib/raiden-apps"
+APPS_STATUS = "/run/raiden-apps/status"   # what raiden-apps is doing right now
 ARRIVING = (("Google Chrome", "google-chrome", "google-chrome.desktop"),
             ("Claude", "claude", "com.anthropic.Claude.desktop"),
             ("Antigravity", "antigravity", "antigravity.desktop"))
@@ -207,12 +208,41 @@ class WelcomeWindow(Adw.ApplicationWindow):
 
     def _arriving_group(self, names):
         group = Adw.PreferencesGroup()
-        subtitle = "They install by themselves a few minutes after this computer is online."
-        if "Google Chrome" in names:
-            subtitle += " Until then, Firefox is your browser."
-        row = Adw.ActionRow(title="On their way: " + ", ".join(names), subtitle=subtitle)
+        row = Adw.ActionRow(title="On their way: " + ", ".join(names))
         row.add_prefix(Gtk.Image(icon_name="folder-download-symbolic", pixel_size=32))
+        spinner = Adw.Spinner(valign=Gtk.Align.CENTER)
+        row.add_suffix(spinner)
+        btn = Gtk.Button(label="Try now", valign=Gtk.Align.CENTER)
+        btn.set_tooltip_text("Start installing them now (asks for your password)")
+        btn.connect("clicked", lambda *_: launch(
+            ["systemctl", "start", "--no-block", "raiden-apps-update.service"]))
+        row.add_suffix(btn)
         group.add(row)
+
+        def refresh():
+            left = arriving_apps()
+            if not left:
+                row.set_title("Your apps are ready")
+                row.set_subtitle("Find them in the start menu.")
+                spinner.set_visible(False)
+                btn.set_visible(False)
+                return GLib.SOURCE_REMOVE
+            row.set_title("On their way: " + ", ".join(left))
+            status = read(APPS_STATUS)
+            if status:
+                subtitle = status + "…"
+            else:
+                subtitle = ("They install by themselves as soon as this computer is online, "
+                            "no restart needed.")
+            if "Google Chrome" in left:
+                subtitle += " Until then, Firefox is your browser."
+            row.set_subtitle(subtitle)
+            spinner.set_visible(bool(status))
+            btn.set_visible(not status)
+            return GLib.SOURCE_CONTINUE
+
+        refresh()
+        GLib.timeout_add_seconds(3, refresh)
         return group
 
     # ------------------------------------------------------------- drivers

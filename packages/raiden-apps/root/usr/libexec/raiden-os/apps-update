@@ -12,6 +12,7 @@
     apps-update install FILE...   install these downloads (image build)
     apps-update check             install missing apps and newer releases (timer)
     apps-update status            show the installed releases
+    apps-update pending           exit 0 if apps are still to be installed once
 
 "check" installs each app once if it is missing: the public edition of the
 ISO leaves out Chrome, Claude and Antigravity, whose licences do not allow
@@ -20,6 +21,12 @@ app removed after that stays removed. Chrome and Claude then update through
 apt like any package; for the others "check" looks up the newest release and
 installs it, but only while that app is closed: a running app breaks when its
 files change under it, so a busy app is updated on a later run instead.
+An app still to be installed once is not left for the next day when its
+first try fails (no internet yet, Wi-Fi connected later, the package lock
+held by Ubuntu's own updates): "check" keeps trying, a little less often
+each time, for a few hours, and NetworkManager starts it again whenever the
+computer goes online. What it is doing is in STATUS_FILE (Welcome shows it),
+and the people logged in get a notification when an app has arrived.
 Files given to "install" carry app and release in their names, like the
 download links: antigravity-2.24.0-5780333019398144-linux-x64.tar.gz,
 protonplus-0.6.8-x86_64.AppImage.
@@ -36,6 +43,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 import urllib.request
 
 ARM = platform.machine() in ("aarch64", "arm64")
@@ -43,6 +51,11 @@ AG_ARCH = "linux-arm" if ARM else "linux-x64"
 CACHE = "/var/cache/raiden-apps"
 STATE = "/var/lib/raiden-apps"     # one file per app that has been installed once
 RELEASE_FILE = ".raiden-release"
+STATUS_FILE = "/run/raiden-apps/status"   # one line for Welcome: what happens now
+# Retries for apps still to be installed once: waits between tries (seconds)
+# and how long to keep going before leaving it to the timer and NetworkManager
+RETRY_WAITS = (30, 60, 120, 300)
+RETRY_FOR = 6 * 3600
 AGENT = {"User-Agent": "raiden-os-apps-update"}
 AG_PAGE = "https://antigravity.google/download?os=linux"
 APT_ENV = dict(os.environ, DEBIAN_FRONTEND="noninteractive")
@@ -77,6 +90,39 @@ APPS = {
 
 def log(msg):
     print(f"apps-update: {msg}", flush=True)
+
+
+def set_status(text):
+    """What apps-update is doing, for Welcome ("" when nothing)."""
+    try:
+        os.makedirs(os.path.dirname(STATUS_FILE), mode=0o755, exist_ok=True)
+        with open(STATUS_FILE + ".tmp", "w", encoding="utf-8") as f:
+            f.write(text + "\n")
+        os.chmod(STATUS_FILE + ".tmp", 0o644)
+        os.replace(STATUS_FILE + ".tmp", STATUS_FILE)
+    except OSError:
+        pass
+
+
+def notify_users(title, body, icon):
+    """Show a desktop notification to everyone logged in graphically."""
+    try:
+        sessions = [e for e in os.scandir("/run/user")
+                    if e.name.isdigit() and int(e.name) >= 1000
+                    and os.path.exists(os.path.join(e.path, "bus"))]
+    except OSError:
+        return
+    for entry in sessions:
+        try:
+            user = pwd.getpwuid(int(entry.name)).pw_name
+            subprocess.run(["runuser", "-u", user, "--", "env",
+                            f"DBUS_SESSION_BUS_ADDRESS=unix:path={entry.path}/bus",
+                            "notify-send", "--app-name=@DISTRO_NAME@", f"--icon={icon}",
+                            title, body],
+                           check=False, timeout=15,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except (KeyError, OSError, subprocess.SubprocessError):
+            continue
 
 
 def release_key(release):
@@ -262,10 +308,45 @@ def download(url, app, release, sha256):
     return path
 
 
-def check():
+def pending():
+    """Apps still to be installed once: missing and never installed before."""
+    out = []
+    for app, a in APPS.items():
+        if a["kind"] == "deb":
+            continue                      # Heroic comes with the image; updated only
+        if installed_release(app):
+            remember(app)
+        elif not remembered(app):
+            out.append(app)
+    return out
+
+
+def online():
+    """True if the internet (not just the local network) can be reached."""
+    try:
+        urllib.request.urlopen(urllib.request.Request(
+            "https://dl.google.com/linux/linux_signing_key.pub", method="HEAD", headers=AGENT),
+            timeout=15).close()
+        return True
+    except OSError:
+        return False
+
+
+def announce(app):
+    a = APPS[app]
+    if a["kind"] == "apt" or app in ("antigravity", "antigravity-ide"):
+        notify_users(f"{a['name']} is ready", "Find it in the start menu.",
+                     "system-software-install")
+
+
+def check_once(only=None):
+    """One pass over the apps (or just ONLY); returns the apps that failed."""
     pages = {}
     apt_lists = False
+    failed = []
     for app, a in APPS.items():
+        if only is not None and app not in only:
+            continue
         have = installed_release(app)
         if have:
             remember(app)
@@ -275,22 +356,28 @@ def check():
             if have:
                 continue                  # apt and its updates take care of it
             try:
+                set_status(f"Installing {a['name']}")
                 if not apt_lists:
                     subprocess.run(["apt-get", "update", "-q", "-o", "DPkg::Lock::Timeout=900"],
                                    check=True, env=APT_ENV, stdout=subprocess.DEVNULL)
                     apt_lists = True
                 install_apt(app)
                 remember(app)
+                refresh_launchers()
+                announce(app)
             except (OSError, subprocess.CalledProcessError) as exc:
-                log(f"could not install {a['name']}, trying again next time: {exc}")
+                log(f"could not install {a['name']}, trying again soon: {exc}")
+                failed.append(app)
             continue
         try:
             found = latest(app, pages)
         except (OSError, ValueError) as exc:
             log(f"cannot look up {a['name']}: {exc}")
+            failed.append(app)
             continue
         if not found:
             log(f"no download found for {a['name']} (did the download page change?)")
+            failed.append(app)
             continue
         release, url, sha256 = found
         if have and release_key(release) <= release_key(have):
@@ -299,13 +386,44 @@ def check():
             log(f"{a['name']} {release} is available; it is open, so it is updated next time")
             continue
         log(f"downloading {a['name']} {release}")
+        set_status(f"Downloading {a['name']}")
         try:
             install(app, download(url, app, release, sha256), release)
             remember(app)
+            if not have:
+                announce(app)
         except (OSError, RuntimeError, tarfile.TarError, subprocess.CalledProcessError) as exc:
             log(f"could not update {a['name']}: {exc}")
+            failed.append(app)
         finally:
             shutil.rmtree(CACHE, ignore_errors=True)
+    return failed
+
+
+def check():
+    """Update everything once; then keep trying the apps that are still to be
+    installed once, so they arrive soon after the computer gets online
+    instead of after the next restart or a day later."""
+    try:
+        check_once()
+        deadline = time.monotonic() + RETRY_FOR
+        tries = 0
+        while (todo := pending()) and time.monotonic() < deadline:
+            names = ", ".join(APPS[app]["name"] for app in todo)
+            wait = RETRY_WAITS[min(tries, len(RETRY_WAITS) - 1)]
+            tries += 1
+            if not online():
+                set_status("Waiting for an internet connection")
+                log(f"no internet yet; {names} will install once it is there")
+            else:
+                set_status(f"Trying again in a moment: {names}")
+            time.sleep(wait)
+            check_once(only=todo)
+        if todo := pending():
+            log("still missing: " + ", ".join(APPS[app]["name"] for app in todo) +
+                "; trying again when the computer goes online or on the next start")
+    finally:
+        set_status("")
     return 0
 
 
@@ -328,6 +446,8 @@ def main(argv):
         return 0
     if len(argv) == 2 and argv[1] == "check":
         return check()
+    if len(argv) == 2 and argv[1] == "pending":
+        return 0 if pending() else 1
     if len(argv) == 2 and argv[1] == "status":
         for app, a in APPS.items():
             print(f"{a['name']}: {installed_release(app) or 'not installed'}")

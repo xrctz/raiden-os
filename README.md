@@ -130,7 +130,10 @@ your user account. Installation takes about 5-10 minutes.
 themselves** a few minutes after the computer is first online: their makers'
 licences don't allow putting them on the ISO, so they come straight from
 Google and Anthropic. Firefox is your browser until then, and Chrome becomes
-the default once it is there. *Welcome* shows what is still on its way.
+the default once it is there. *Welcome* shows what is still on its way and
+what is happening right now (*Try now* starts it at once); a notification
+says when each app is ready. No restart is needed: if the computer is not
+online yet, the apps install as soon as it is.
 
 The **Welcome** app opens at the first login: pick a layout, check for
 updates, see your graphics driver status, and find your games, school and AI
@@ -318,9 +321,11 @@ os-release), so Ubuntu tools, PPAs, `.deb` packages and documentation all work.
 * **A 120/144/180 Hz monitor runs at 60 Hz** → Raiden OS picks the highest
   refresh rate the first time it sees a monitor (unless you already chose one
   in *Settings → Displays*, which it keeps).
-* **Chrome, Claude or Antigravity did not appear** → they need internet on
-  the first start; they install a few minutes after the computer is online
-  (`systemctl status raiden-apps-update` shows what happened).
+* **Chrome, Claude or Antigravity did not appear** → they need internet; they
+  install as soon as the computer is online, retrying by themselves for a few
+  hours and again whenever it reconnects, no restart needed. *Welcome → Try
+  now* starts it at once; `journalctl -u raiden-apps-update` shows what
+  happened.
 * **The clock is wrong by a few hours after switching between Windows and
   Linux** → run `sudo timedatectl set-local-rtc 1` once.
 * **Flickering lines at the top of the screen, stutter, or stuck at 60 Hz on a
